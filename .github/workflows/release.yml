@@ -1,0 +1,91 @@
+name: Create Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'version.json'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Inject version into HTML and rename file
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' version.json)
+          NOTES=$(jq -r '.notes' version.json)
+          DATE=$(jq -r '.date' version.json)
+          EXPECTED_FILENAME="TIA_Analisi_Variabili_v${VERSION}.html"
+
+          # Find existing HTML file
+          CURRENT_FILE=$(ls TIA_Analisi_Variabili_v*.html 2>/dev/null | head -1)
+          if [ -z "$CURRENT_FILE" ]; then
+            echo "❌ Nessun file HTML trovato!"
+            exit 1
+          fi
+
+          echo "📄 File trovato: $CURRENT_FILE"
+          echo "🎯 Versione target: $VERSION"
+
+          # 1. Update APP_VERSION
+          sed -i "s/const APP_VERSION='[^']*'/const APP_VERSION='${VERSION}'/" "$CURRENT_FILE"
+
+          # 2. Update <title>
+          sed -i "s|<title>TIA Var Analyzer · v[^<]*</title>|<title>TIA Var Analyzer · v${VERSION}</title>|" "$CURRENT_FILE"
+
+          # 3. Update version badge in top bar
+          sed -i "s|<div class=\"version-badge\">v[^<]*</div>|<div class=\"version-badge\">v${VERSION}</div>|" "$CURRENT_FILE"
+
+          # 4. Rename file if needed
+          if [ "$CURRENT_FILE" != "$EXPECTED_FILENAME" ]; then
+            echo "🔄 Rinomino $CURRENT_FILE -> $EXPECTED_FILENAME"
+            git mv "$CURRENT_FILE" "$EXPECTED_FILENAME"
+          fi
+
+          # 5. Update version.json filename
+          jq --arg f "$EXPECTED_FILENAME" '.filename = $f' version.json > version.tmp && mv version.tmp version.json
+
+          # 6. Commit if anything changed
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: auto-bump version to v${VERSION} in HTML"
+            git push
+          else
+            echo "✅ Nessuna modifica necessaria"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "filename=$EXPECTED_FILENAME" >> "$GITHUB_OUTPUT"
+          echo "notes=$NOTES" >> "$GITHUB_OUTPUT"
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: "TIA Var Analyzer v${{ steps.version.outputs.version }}"
+          body: |
+            ## 🚀 TIA Var Analyzer v${{ steps.version.outputs.version }}
+
+            📅 Data: ${{ steps.version.outputs.date }}
+
+            ### Note
+            ${{ steps.version.outputs.notes }}
+
+            ### Download
+            Scarica il file **${{ steps.version.outputs.filename }}** qui sotto e aprilo nel browser.
+          files: ${{ steps.version.outputs.filename }}
+          make_latest: true

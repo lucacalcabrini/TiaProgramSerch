@@ -1,0 +1,9 @@
+# Test files
+*.xlsx
+*.xls
+*.pdf
+*.docx
+*.pptx
+
+# Old versions (only latest version is tracked)
+TIA_Analisi_Variabili_v1*.html
