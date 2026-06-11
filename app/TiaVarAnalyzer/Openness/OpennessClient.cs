@@ -7,7 +7,6 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Xml;
 using Siemens.Engineering;
-using Siemens.Engineering.Cax;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
@@ -123,17 +122,16 @@ namespace TiaVarAnalyzer.Openness
             }
         }
 
-        // ---- export completo del progetto in XML (SW + HW) --------------------
-        // SW: blocchi, tabelle variabili e tipi dati (UDT) in SimaticML, con la
-        //     stessa struttura di cartelle del progetto.
-        // HW: configurazione dispositivi/reti in AutomationML (export CAx).
+        // ---- export completo del SW del progetto in XML ------------------------
+        // Blocchi, tabelle variabili e tipi dati (UDT) in SimaticML, con la
+        // stessa struttura di cartelle del progetto.
         // Scrive in <outDir>\<Progetto>_XML_<timestamp>\ e NON modifica il progetto.
 
         public XmlExportResult ExportProjectXml(string path, string outDir, Action<int, string> progress = null,
                                                 string umacUser = null, string umacPassword = null)
         {
             if (Mock)
-                return new XmlExportResult { OutDir = Path.Combine(outDir ?? @"C:\Temp", "Mock_XML"), Project = "Mock", Plcs = 1, Blocks = 3, TagTables = 2, Types = 1, Skipped = 0, Hardware = true };
+                return new XmlExportResult { OutDir = Path.Combine(outDir ?? @"C:\Temp", "Mock_XML"), Project = "Mock", Plcs = 1, Blocks = 3, TagTables = 2, Types = 1, Skipped = 0 };
             Initialize();
 
             void Report(int p, string t) { try { progress?.Invoke(p, t); } catch { } }
@@ -193,25 +191,6 @@ namespace TiaVarAnalyzer.Openness
                             res.Types++;
                         else res.Skipped++;
                     }
-                }
-
-                // -- HW: configurazione completa in AutomationML (CAx) --
-                Report(85, "Export hardware (AutomationML)...");
-                try
-                {
-                    var cax = project.GetService<CaxProvider>();
-                    if (cax == null) throw new Exception("Servizio CAx non disponibile in questa versione di TIA.");
-                    string hwDir = Path.Combine(root, "Hardware");
-                    Directory.CreateDirectory(hwDir);
-                    string aml = Path.Combine(hwDir, SafeName(project.Name) + ".aml");
-                    string log = Path.Combine(hwDir, "CaxExport.log");
-                    res.Hardware = cax.Export(project, new FileInfo(aml), new FileInfo(log));
-                    if (!res.Hardware) res.HardwareError = "Export CAx terminato con avvisi: vedi " + log;
-                }
-                catch (Exception ex)
-                {
-                    res.Hardware = false;
-                    res.HardwareError = FirstLine(ex.Message);
                 }
 
                 Report(94, "Chiusura di TIA Portal...");

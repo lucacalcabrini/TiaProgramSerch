@@ -61,7 +61,7 @@ namespace TiaVarAnalyzer.Openness
         public int Linea { get; set; }
     }
 
-    // Esito dell'export completo del progetto in XML (SW SimaticML + HW AutomationML).
+    // Esito dell'export completo del SW del progetto in XML (SimaticML).
     public class XmlExportResult
     {
         public string OutDir { get; set; }
@@ -71,8 +71,6 @@ namespace TiaVarAnalyzer.Openness
         public int TagTables { get; set; }
         public int Types { get; set; }
         public int Skipped { get; set; }
-        public bool Hardware { get; set; }
-        public string HardwareError { get; set; }
     }
 
     public class Bundle

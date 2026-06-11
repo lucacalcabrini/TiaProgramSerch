@@ -11,9 +11,9 @@ Due modi per fornire i dati, **stessa interfaccia**:
 | 📂 **Progetto TIA** | Apri un **`.ap18`** o un archivio **`.zap18`/`.zap`**: l'app avvia TIA Portal **headless** in background (Openness), esporta i blocchi e li analizza. Non serve avere TIA aperto. |
 | 📊 **Excel** | Re-import di un export precedente di questo tool (per il confronto/diff) |
 
-In più, il pulsante **💾 XML** esporta **l'intero progetto in XML**: tutti i blocchi, le tabelle
-delle variabili e i tipi dati (UDT) in **SimaticML**, più la configurazione **hardware** completa
-in **AutomationML** (`.aml`, export CAx) — mantenendo la struttura di cartelle del progetto.
+In più, il pulsante **💾 XML** esporta **tutto il SW del progetto in XML**: blocchi, tabelle
+delle variabili e tipi dati (UDT) in **SimaticML**, mantenendo la struttura di cartelle del
+progetto.
 
 Gli archivi `.zap` vengono estratti in una cartella temporanea: **il file originale non viene mai
 modificato**. Archivi di versioni TIA precedenti vengono aggiornati automaticamente sulla sola
@@ -50,14 +50,14 @@ dotnet build app\TiaVarAnalyzer\TiaVarAnalyzer.csproj -c Debug
 # analisi VS_Pos / additionalPiecePresence -> JSON
 TiaVarAnalyzer.exe --export "C:\percorso\Progetto.zap18" --out "C:\temp\bundle.json"
 
-# export completo del progetto in XML (SW SimaticML + HW AutomationML)
+# export completo del SW del progetto in XML (SimaticML)
 TiaVarAnalyzer.exe --exportxml "C:\percorso\Progetto.zap18" --outdir "C:\temp\export"
 ```
 Progetti protetti (UMAC): aggiungere `--user <utente> --pass <password>` (exit code 2 = credenziali
 mancanti/errate). Ogni comando scrive un log testuale accanto all'output. Exit code 0 = ok.
 
 Struttura dell'export XML: `<outdir>\<Progetto>_XML_<timestamp>\<PLC>\{Blocchi,TabelleVariabili,TipiDati}\...`
-(con le sottocartelle dei gruppi del progetto) + `Hardware\<Progetto>.aml` e `CaxExport.log`.
+(con le sottocartelle dei gruppi del progetto).
 I blocchi know-how protected non sono esportabili e vengono conteggiati come "saltati".
 
 ### Release (installer + auto-update)

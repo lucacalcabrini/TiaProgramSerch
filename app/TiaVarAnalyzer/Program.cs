@@ -12,7 +12,7 @@ namespace TiaVarAnalyzer
 {
     internal static class Program
     {
-        public const string AppVersion = "3.2.0";
+        public const string AppVersion = "3.2.1";
         const string RepoUrl = "https://github.com/lucacalcabrini/TiaProgramSerch";
 
         [STAThread]
@@ -23,7 +23,7 @@ namespace TiaVarAnalyzer
 
             // Modalità batch senza UI:
             //   --export <progetto> [--out <file.json>]        analisi VS_Pos/APP
-            //   --exportxml <progetto> --outdir <cartella>     export completo XML (SW+HW)
+            //   --exportxml <progetto> --outdir <cartella>     export completo XML del SW
             if (args.Contains("--export"))
             {
                 Environment.Exit(RunCliExport(args));
@@ -91,7 +91,7 @@ namespace TiaVarAnalyzer
             }
         }
 
-        // Export completo del progetto in XML (SW SimaticML + HW AutomationML) da riga di comando.
+        // Export completo del SW del progetto in XML (SimaticML) da riga di comando.
         // Uso: --exportxml <progetto> --outdir <cartella> [--user <utente> --pass <password>]
         // Log: <outdir>\export-xml.log. Exit code 0 = ok, 2 = servono credenziali.
         static int RunCliExportXml(string[] args)
@@ -119,7 +119,7 @@ namespace TiaVarAnalyzer
                 Log("exportxml: " + path + " -> " + outDir);
                 var client = new OpennessClient(mock: false);
                 var res = client.ExportProjectXml(path, outDir, (p, t) => Log(p + "% " + t), user, pass);
-                Log($"OK -> {res.OutDir} | plc={res.Plcs} blocchi={res.Blocks} tabelle={res.TagTables} udt={res.Types} saltati={res.Skipped} hw={res.Hardware} {res.HardwareError}");
+                Log($"OK -> {res.OutDir} | plc={res.Plcs} blocchi={res.Blocks} tabelle={res.TagTables} udt={res.Types} saltati={res.Skipped}");
                 return 0;
             }
             catch (ProtectedProjectException pex)
