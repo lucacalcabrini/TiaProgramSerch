@@ -1,0 +1,2250 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIA Var Analyzer · v2.4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:     #090c12;
+  --bg2:    #0f1420;
+  --bg3:    #141926;
+  --bg4:    #1a2030;
+  --border: #1c2438;
+  --border2:#263045;
+  --accent: #00d4ff;
+  --acc2:   #ff6b35;
+  --acc3:   #39ff8f;
+  --acc4:   #c084fc;
+  --text:   #c8d4e8;
+  --text2:  #7a8ba8;
+  --text3:  #3d4f6a;
+  --hl-vs:  rgba(57,255,143,0.12);
+  --hl-app: rgba(255,107,53,0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ===== TOP BAR ===== */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(9,12,18,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  display: flex; align-items: center; gap: 20px; height: 54px;
+}
+
+.logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 700;
+  color: var(--accent); letter-spacing: 1px;
+  white-space: nowrap;
+}
+.logo span { color: var(--text2); font-weight: 400; }
+
+.version-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(192,132,252,0.1);
+  border: 1px solid rgba(192,132,252,0.3);
+  border-radius: 20px;
+  padding: 3px 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 600;
+  color: var(--acc4);
+  user-select: none;
+}
+.version-badge::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--acc4);
+}
+
+.topbar-project {
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar-project strong { color: var(--text); }
+
+.topbar-stats {
+  display: flex; gap: 16px; align-items: center; flex-shrink: 0;
+}
+.ts { text-align: center; }
+.ts-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; font-weight: 700; line-height: 1;
+}
+.ts-num.g { color: var(--acc3); }
+.ts-num.o { color: var(--acc2); }
+.ts-num.b { color: var(--accent); }
+.ts-lbl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ===== CONTAINER ===== */
+.container { position: relative; z-index: 1; max-width: 1500px; margin: 0 auto; padding: 28px 28px 60px; }
+
+/* ===== DROP ZONE ===== */
+#dropzone {
+  border: 2px dashed var(--border2);
+  border-radius: 12px;
+  background: var(--bg2);
+  padding: 52px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+#dropzone::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 120%, rgba(0,212,255,0.04), transparent 60%);
+  pointer-events: none;
+}
+#dropzone.drag-over {
+  border-color: var(--accent);
+  background: rgba(0,212,255,0.04);
+  transform: scale(1.005);
+}
+#dropzone:hover { border-color: var(--border2); filter: brightness(1.1); }
+
+.drop-icon {
+  font-size: 52px; margin-bottom: 16px;
+  filter: grayscale(0.3);
+}
+.drop-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 22px; font-weight: 700; color: #fff;
+  margin-bottom: 6px;
+}
+.drop-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+  margin-bottom: 20px;
+}
+.drop-btn {
+  display: inline-block;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 9px 24px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px; font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.drop-btn:hover { background: rgba(0,212,255,0.1); }
+#fileInput { display: none; }
+
+/* ===== PROGRESS ===== */
+#progress-section {
+  display: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px 32px;
+  margin-bottom: 28px;
+  text-align: center;
+}
+.prog-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px; font-weight: 700; color: #fff;
+  margin-bottom: 6px;
+}
+.prog-file {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+  margin-bottom: 20px;
+}
+.prog-bar-wrap {
+  background: var(--bg3);
+  border-radius: 8px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.prog-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--acc3));
+  border-radius: 8px;
+  transition: width 0.1s;
+  width: 0%;
+}
+.prog-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+}
+
+/* ===== PROJECT INFO BAR ===== */
+#info-bar {
+  display: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin-bottom: 24px;
+  display: none;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+}
+.info-field { display: flex; flex-direction: column; gap: 2px; }
+.info-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--text3);
+}
+.info-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; color: var(--text);
+}
+.info-value.accent { color: var(--accent); }
+.info-value.green  { color: var(--acc3); }
+.info-value.orange { color: var(--acc2); }
+
+.btn-new-file {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 7px 16px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px; font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-new-file:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===== ANALYSIS SECTION ===== */
+#analysis { display: none; }
+
+/* ===== TABS ===== */
+.tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.tab {
+  padding: 10px 26px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px; font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid transparent; border-bottom: none;
+  position: relative; bottom: -1px;
+  transition: all 0.2s;
+  color: var(--text2); background: transparent;
+}
+.tab:hover { color: var(--text); background: var(--bg3); }
+.tab.active { background: var(--bg2); border-color: var(--border); border-bottom-color: var(--bg2); color: #fff; }
+.tab.active.vs-tab  { color: var(--acc3);  border-top: 2px solid var(--acc3); }
+.tab.active.app-tab { color: var(--acc2);  border-top: 2px solid var(--acc2); }
+.tab-count {
+  display: inline-block;
+  background: var(--bg3); border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 12px; font-family: 'JetBrains Mono', monospace;
+  margin-left: 6px;
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ===== FILTERS ===== */
+.filters {
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.filter-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 130px; }
+label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text3); font-family: 'JetBrains Mono', monospace;
+}
+select, input[type=text] {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 7px 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; outline: none;
+  transition: border-color 0.2s; width: 100%;
+}
+select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,0.08); }
+.btn-reset {
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  color: var(--text2);
+  padding: 7px 16px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap; align-self: flex-end;
+}
+.btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===== SUMMARY GRID ===== */
+.section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text3);
+  margin-bottom: 10px; font-family: 'JetBrains Mono', monospace;
+}
+.summary-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;
+}
+.summary-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  cursor: pointer; transition: all 0.18s;
+  min-width: 130px;
+}
+.summary-box:hover, .summary-box.sel {
+  border-color: var(--acc3); background: var(--hl-vs);
+}
+.summary-box.orange:hover, .summary-box.orange.sel {
+  border-color: var(--acc2); background: var(--hl-app);
+}
+.sb-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--text2); margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sb-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px; font-weight: 700; color: var(--acc3);
+}
+.summary-box.orange .sb-count { color: var(--acc2); }
+
+/* ===== TABLE ===== */
+.results-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.results-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+}
+.results-count strong { color: var(--accent); }
+
+.no-results {
+  text-align: center; padding: 56px 20px;
+  color: var(--text3); font-family: 'JetBrains Mono', monospace; font-size: 13px;
+}
+.no-results::before { content: '∅'; display: block; font-size: 44px; margin-bottom: 10px; opacity: 0.25; }
+
+/* ===== TOGGLE ASSEGNAZIONI ===== */
+.assign-toggle {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(57,255,143,0.06);
+  border: 1px solid rgba(57,255,143,0.22);
+  border-radius: 6px;
+  padding: 7px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+.assign-toggle:hover { background: rgba(57,255,143,0.1); }
+.assign-toggle.orange {
+  background: rgba(255,107,53,0.06);
+  border-color: rgba(255,107,53,0.22);
+}
+.assign-toggle.orange:hover { background: rgba(255,107,53,0.1); }
+
+.toggle-sw {
+  width: 32px; height: 18px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-sw::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: all 0.2s;
+}
+.assign-toggle.on .toggle-sw { background: rgba(57,255,143,0.3); border-color: var(--acc3); }
+.assign-toggle.on .toggle-sw::after { left: 16px; background: var(--acc3); }
+.assign-toggle.orange.on .toggle-sw { background: rgba(255,107,53,0.3); border-color: var(--acc2); }
+.assign-toggle.orange.on .toggle-sw::after { background: var(--acc2); }
+
+.toggle-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; font-weight: 600;
+  color: var(--text2);
+}
+.assign-toggle.on .toggle-label { color: var(--acc3); }
+.assign-toggle.orange.on .toggle-label { color: var(--acc2); }
+
+.toggle-ops {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--text3);
+}
+.assign-toggle.on .toggle-ops { color: var(--acc3); opacity: 0.7; }
+.assign-toggle.orange.on .toggle-ops { color: var(--acc2); opacity: 0.7; }
+
+/* ===== TABLE BASE ===== */
+thead tr { background: var(--bg3); border-bottom: 1px solid var(--border2); }
+th {
+  padding: 9px 13px;
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+  color: var(--text2); text-transform: uppercase;
+  white-space: nowrap; cursor: pointer; user-select: none;
+  transition: color 0.2s;
+}
+th:hover { color: var(--accent); }
+th.sorted { color: var(--accent); }
+.sa { margin-left: 4px; opacity: 0.4; font-size: 10px; }
+th.sorted .sa { opacity: 1; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(0,212,255,0.04); }
+td { padding: 9px 13px; vertical-align: middle; }
+
+.tag { display: inline-block; border-radius: 4px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.tag-asse { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.22); }
+.tag-idx  { background: rgba(57,255,143,0.1); color: var(--acc3);  border: 1px solid rgba(57,255,143,0.22); text-align:center; min-width:34px; }
+.tag-num  { background: rgba(255,107,53,0.1);  color: var(--acc2);  border: 1px solid rgba(255,107,53,0.22); text-align:center; min-width:34px; }
+.tag-op   { background: rgba(122,139,168,0.08); color: var(--text2); border: 1px solid var(--border2); text-align:center; min-width:40px; }
+.tag-comment {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: #f0c96a;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block; max-width: 100%;
+}
+
+.ln  { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text3); }
+.bn  { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); }
+
+/* ===== VIEW BUTTON ===== */
+.btn-view {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  background: rgba(0,212,255,0.07);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 5px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btn-view:hover {
+  background: rgba(0,212,255,0.18);
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+/* ===== RESIZABLE COLUMNS ===== */
+.table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+col.col-view  { width: 38px; }
+col.col-linea { width: 64px; }
+col.col-blocco{ width: 180px; }
+col.col-seg   { width: 200px; }
+col.col-asse  { width: 180px; }
+col.col-idx   { width: 80px; }
+col.col-op    { width: 54px; }
+col.col-testo { width: auto; min-width: 160px; }
+
+th { position: relative; overflow: hidden; }
+th .col-resize {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: 5px; cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 2;
+}
+th .col-resize:hover, th .col-resize.dragging { background: var(--accent); opacity: 0.5; }
+
+.sn  { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc  { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc .hl { color: #fff; background: rgba(255,255,100,0.15); border-radius: 2px; padding: 0 2px; }
+
+/* ===== PDF MODAL ===== */
+#pdf-modal {
+  display: none;
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+#pdf-modal.open { display: flex; }
+
+.modal-box {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  width: min(96vw, 900px);
+  height: min(92vh, 1050px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+}
+
+.modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  flex-shrink: 0;
+}
+.modal-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.modal-title strong { color: var(--accent); }
+.modal-nav { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.modal-nav button {
+  background: var(--bg4); border: 1px solid var(--border2);
+  border-radius: 5px; color: var(--text);
+  padding: 5px 10px; cursor: pointer; font-size: 13px;
+  transition: all 0.15s;
+}
+.modal-nav button:hover { border-color: var(--accent); color: var(--accent); }
+.modal-nav button:disabled { opacity: 0.3; cursor: default; }
+.modal-page-info {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text2);
+  white-space: nowrap;
+}
+.modal-close {
+  background: transparent; border: 1px solid var(--border2);
+  border-radius: 5px; color: var(--text2);
+  width: 28px; height: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: all 0.15s; flex-shrink: 0;
+}
+.modal-close:hover { border-color: var(--acc2); color: var(--acc2); }
+
+.modal-match-bar {
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--text2);
+  background: rgba(0,212,255,0.04);
+  flex-shrink: 0;
+}
+.modal-match-bar span { color: var(--accent); font-weight: 600; }
+
+.modal-canvas-wrap {
+  flex: 1; overflow: auto;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 16px;
+  background: #1a1a22;
+}
+#pdf-canvas {
+  display: block;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  max-width: 100%;
+}
+.modal-loading {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  padding: 60px;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ===== GLOBAL SEARCH ===== */
+.global-search-wrap {
+  flex: 1; display: flex; align-items: center;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0 10px;
+  gap: 8px; max-width: 320px;
+}
+.global-search-wrap:focus-within { border-color: var(--accent); }
+.global-search-icon { color: var(--text3); font-size: 13px; flex-shrink:0; }
+#global-search {
+  background: transparent; border: none; outline: none;
+  color: var(--text); font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; width: 100%; padding: 7px 0;
+}
+#global-search::placeholder { color: var(--text3); }
+
+/* ===== ACTION BUTTONS IN TOPBAR ===== */
+.topbar-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.btn-action {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  color: var(--text2);
+  padding: 5px 12px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.18s; white-space: nowrap;
+}
+.btn-action:hover { border-color: var(--accent); color: var(--accent); }
+.btn-action.green:hover { border-color: var(--acc3); color: var(--acc3); }
+.btn-action.orange:hover { border-color: var(--acc2); color: var(--acc2); }
+.btn-action:disabled { opacity: 0.3; cursor: default; }
+
+/* ===== SOURCE BADGE ===== */
+.src-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 120px; overflow: hidden; text-overflow: ellipsis;
+}
+.src-pdf  { background: rgba(0,212,255,0.1);  color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+.src-xlsx { background: rgba(57,255,143,0.1); color: var(--acc3);   border: 1px solid rgba(57,255,143,0.2); }
+.src-tia  { background: rgba(183,148,246,0.12); color:#c4a9f9; border:1px solid rgba(183,148,246,0.28); }
+
+/* ===== TIA PROJECT SELECTION MODAL ===== */
+#tia-modal{ display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.62); align-items:center; justify-content:center; }
+#tia-modal.open{ display:flex; }
+.tia-modal-box{ background:var(--bg3); border:1px solid rgba(255,255,255,0.1); border-radius:14px; width:min(580px,92vw); max-height:82vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,0.55); }
+.tia-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.tia-modal-head h3{ margin:0; font-size:15px; color:var(--text); }
+.tia-modal-x{ background:none; border:none; color:var(--text2); font-size:22px; line-height:1; cursor:pointer; }
+.tia-modal-x:hover{ color:#fff; }
+.tia-modal-sub{ padding:12px 20px 0; font-size:12px; color:var(--text2); }
+#tia-proj-list{ padding:12px 16px 18px; display:flex; flex-direction:column; gap:8px; }
+.tia-proj-item{ padding:12px 14px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; cursor:pointer; transition:border-color .15s, background .15s; }
+.tia-proj-item:hover{ border-color:#b794f6; background:rgba(183,148,246,0.08); }
+.tia-proj-name{ font-weight:600; color:var(--text); font-size:14px; }
+.tia-proj-path{ font-size:11px; color:var(--text3); margin-top:3px; word-break:break-all; }
+.drop-btn.tia{ border-color:#b794f6; color:#c4a9f9; }
+.btn-action.tia{ border-color:rgba(183,148,246,0.4); color:#c4a9f9; }
+
+/* ===== DIFF TAB ===== */
+.tab.active.diff-tab { color: #f0c96a; border-top: 2px solid #f0c96a; }
+
+/* ===== DIFF TABLE ===== */
+.diff-legend { display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.diff-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.diff-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.diff-dot.added    { background: var(--acc3); }
+.diff-dot.removed  { background: var(--acc2); }
+.diff-dot.changed  { background: #f0c96a; }
+.diff-dot.same     { background: var(--text3); }
+
+tr.diff-added   td { background: rgba(57,255,143,0.05); }
+tr.diff-removed td { background: rgba(255,107,53,0.06); }
+tr.diff-changed td { background: rgba(240,201,106,0.05); }
+
+.diff-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700;
+  border-radius: 3px; padding: 2px 7px;
+}
+.diff-status.added   { background: rgba(57,255,143,0.15); color: var(--acc3); }
+.diff-status.removed { background: rgba(255,107,53,0.15);  color: var(--acc2); }
+.diff-status.changed { background: rgba(240,201,106,0.15); color: #f0c96a; }
+.diff-status.same    { background: rgba(122,139,168,0.1);  color: var(--text3); }
+
+/* ===== SORGENTI PANEL ===== */
+.sources-bar {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px; align-items: center;
+}
+.source-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+.source-chip-name { color: var(--text); }
+.source-chip-type { font-size: 10px; }
+.source-chip-cnt  { color: var(--text2); font-size: 11px; }
+.source-chip-x {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; font-size: 13px; padding: 0 2px;
+  transition: color 0.15s;
+}
+.source-chip-x:hover { color: var(--acc2); }
+
+@media (max-width: 768px) {
+  .topbar { padding: 0 14px; gap: 10px; }
+  .topbar-stats, .topbar-actions { display: none; }
+  .container { padding: 16px 14px 40px; }
+}
+
+.update-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#1e40af,#7c3aed);color:#fff;padding:10px 20px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:slideDown .4s ease}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.update-banner a{color:#fde68a;text-decoration:underline;cursor:pointer;margin-left:8px}
+.update-banner .update-close{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:18px;cursor:pointer;opacity:.7}
+.update-banner .update-close:hover{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">TIA<span> Var</span>Analyzer</div>
+  <div class="version-badge">v2.4</div>
+  <div class="global-search-wrap">
+    <span class="global-search-icon">⌕</span>
+    <input type="text" id="global-search" placeholder="Ricerca globale tutti i tab..." oninput="onGlobalSearch()">
+  </div>
+  <div class="topbar-project" id="topbar-info">
+    Nessun file caricato — trascina un PDF o un Excel esportato
+  </div>
+  <div class="topbar-actions">
+    <button class="btn-action green" id="btn-export" disabled onclick="exportExcel()">⬇ Excel</button>
+    <button class="btn-action orange" id="btn-add-pdf" disabled onclick="document.getElementById('addPdfInput').click()">＋ PDF</button>
+    <button class="btn-action tia" id="btn-add-tia" onclick="loadFromTia()" title="Leggi da un progetto TIA Portal aperto">📡 TIA</button>
+    <input type="file" id="addPdfInput" accept=".pdf" style="display:none" onchange="handleAddPDF(event)">
+  </div>
+  <div class="topbar-stats">
+    <div class="ts"><div class="ts-num g" id="st-vs">—</div><div class="ts-lbl">VS_Pos</div></div>
+    <div class="ts"><div class="ts-num o" id="st-app">—</div><div class="ts-lbl">AddPiece</div></div>
+    <div class="ts"><div class="ts-num b" id="st-pag">—</div><div class="ts-lbl">Pagine</div></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- DROP ZONE -->
+  <div id="dropzone" onclick="if(event.target===this||event.target.id==='dropzone-inner'||event.target.classList.contains('drop-icon')||event.target.classList.contains('drop-title')||event.target.classList.contains('drop-sub')) document.getElementById('fileInput').click()">
+    <div id="dropzone-inner">
+      <div class="drop-icon">📄</div>
+      <div class="drop-title">Carica PDF o Excel TIA Var Analyzer</div>
+      <div class="drop-sub">Trascina qui il file oppure clicca per selezionarlo<br>
+        <strong style="color:var(--accent)">PDF</strong> — stampa TIA Portal (analisi completa) &nbsp;·&nbsp;
+        <strong style="color:var(--acc3)">XLSX</strong> — export precedente (caricamento istantaneo) &nbsp;·&nbsp;
+        <strong style="color:#c4a9f9">TIA</strong> — leggi direttamente da un progetto aperto (bridge Openness)
+      </div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button class="drop-btn" onclick="document.getElementById('fileInput').click()">
+          Seleziona PDF
+        </button>
+        <button class="drop-btn" style="border-color:var(--acc3);color:var(--acc3)" onclick="document.getElementById('xlsxInput').click()">
+          Carica Excel
+        </button>
+        <button class="drop-btn tia" onclick="loadFromTia()">
+          📡 Leggi da progetto TIA
+        </button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleFile(event)">
+  <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none" onchange="handleXlsx(event)">
+
+  <!-- PROGRESS -->
+  <div id="progress-section">
+    <div class="prog-title">Analisi in corso...</div>
+    <div class="prog-file" id="prog-file"></div>
+    <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+    <div class="prog-status" id="prog-status">Inizializzazione...</div>
+  </div>
+
+  <!-- PROJECT INFO BAR -->
+  <div id="info-bar">
+    <div class="info-field">
+      <div class="info-label">Progetto</div>
+      <div class="info-value accent" id="inf-project">—</div>
+    </div>
+    <div class="info-field">
+      <div class="info-label">File</div>
+      <div class="info-value" id="inf-file">—</div>
+    </div>
+    <div class="info-field">
+      <div class="info-label">Pagine</div>
+      <div class="info-value" id="inf-pages">—</div>
+    </div>
+    <div class="info-field">
+      <div class="info-label">Blocchi FC/FB/OB</div>
+      <div class="info-value green" id="inf-blocks">—</div>
+    </div>
+    <div class="info-field">
+      <div class="info-label">Analisi effettuata</div>
+      <div class="info-value" id="inf-date">—</div>
+    </div>
+    <div class="info-field">
+      <div class="info-label">Versione TIA</div>
+      <div class="info-value" id="inf-tia">—</div>
+    </div>
+    <button class="btn-new-file" onclick="resetAll()">↺ Nuovo file</button>
+  </div>
+
+  <!-- SOURCES BAR (visible when multiple sources loaded) -->
+  <div id="sources-bar" style="display:none" class="sources-bar"></div>
+
+  <!-- ANALYSIS -->
+  <div id="analysis">
+    <div class="tabs">
+      <div class="tab vs-tab active" onclick="switchTab('vs')">
+        🎯 VS_Pos
+        <span class="tab-count" id="tc-vs">0</span>
+      </div>
+      <div class="tab app-tab" onclick="switchTab('app')">
+        🔍 AddPiecePresence
+        <span class="tab-count" id="tc-app">0</span>
+      </div>
+      <div class="tab diff-tab" id="tab-diff" onclick="switchTab('diff')" style="display:none">
+        ⚡ Confronto
+        <span class="tab-count" id="tc-diff">0</span>
+      </div>
+    </div>
+
+    <!-- VS_POS PANEL -->
+    <div class="panel active" id="panel-vs">
+      <div class="section-title">Filtro rapido · Asse</div>
+      <div class="summary-grid" id="asse-grid"></div>
+
+      <div class="filters">
+        <div class="filter-group">
+          <label>Asse</label>
+          <select id="vs-asse" onchange="syncAsseBox(); renderVS()">
+            <option value="">Tutti gli assi</option>
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:115px">
+          <label>VS_Pos [n]</label>
+          <select id="vs-idx" onchange="renderVS()">
+            <option value="">Tutti</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Blocco</label>
+          <select id="vs-blocco" onchange="renderVS()">
+            <option value="">Tutti i blocchi</option>
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:140px" id="vs-sorgente-wrap">
+          <label>Sorgente</label>
+          <select id="vs-sorgente" onchange="renderVS()">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:200px">
+          <label>Testo libero</label>
+          <input type="text" id="vs-search" placeholder="cerca..." oninput="renderVS()">
+        </div>
+        <div class="assign-toggle on" id="vs-assign-toggle" onclick="toggleAssign('vs')">
+          <div class="toggle-sw"></div>
+          <div>
+            <div class="toggle-label">Solo assegnazioni</div>
+            <div class="toggle-ops">= &nbsp;&nbsp; S</div>
+          </div>
+        </div>
+        <div class="assign-toggle" id="vs-comment-toggle" onclick="toggleVsComment()" style="border-color:rgba(240,201,106,0.3); background:rgba(240,201,106,0.04);">
+          <div class="toggle-sw" style=""></div>
+          <div>
+            <div class="toggle-label" style="color:var(--text2);">Solo con commento</div>
+            <div class="toggle-ops">💬</div>
+          </div>
+        </div>
+        <button class="btn-reset" onclick="resetVS()">↺ Reset</button>
+      </div>
+
+      <div class="results-header">
+        <div class="results-count">Risultati: <strong id="vs-count">0</strong></div>
+      </div>
+      <div class="table-wrap">
+        <table id="vs-table">
+          <colgroup>
+            <col class="col-view">
+            <col class="col-linea">
+            <col class="col-blocco">
+            <col class="col-seg">
+            <col class="col-asse">
+            <col class="col-idx">
+            <col class="col-op">
+            <col style="width:180px">
+            <col style="width:110px">
+            <col class="col-testo">
+          </colgroup>
+          <thead><tr>
+            <th></th>
+            <th onclick="sortVS('linea')">Linea<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortVS('blocco')">Blocco<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortVS('segmento')">Segmento<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortVS('asse')">Asse<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortVS('indice')">VS_Pos[n]<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th>Op.<div class="col-resize"></div></th>
+            <th onclick="sortVS('commento')">Commento<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortVS('sorgente')">Sorgente<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th>Istruzione<div class="col-resize"></div></th>
+          </tr></thead>
+          <tbody id="vs-tbody"></tbody>
+        </table>
+      </div>
+      <div class="no-results" id="vs-empty" style="display:none">Nessun risultato</div>
+    </div>
+
+    <!-- APP PANEL -->
+    <div class="panel" id="panel-app">
+      <div class="section-title">Filtro rapido · Numero presenza</div>
+      <div class="summary-grid" id="num-grid"></div>
+
+      <div class="filters">
+        <div class="filter-group" style="max-width:150px">
+          <label>Numero [1-8]</label>
+          <select id="app-num" onchange="syncNumBox(); renderAPP()">
+            <option value="">Tutti</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Blocco</label>
+          <select id="app-blocco" onchange="renderAPP()">
+            <option value="">Tutti i blocchi</option>
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:140px" id="app-sorgente-wrap">
+          <label>Sorgente</label>
+          <select id="app-sorgente" onchange="renderAPP()">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:200px">
+          <label>Testo libero</label>
+          <input type="text" id="app-search" placeholder="cerca..." oninput="renderAPP()">
+        </div>
+        <div class="assign-toggle orange on" id="app-assign-toggle" onclick="toggleAssign('app')">
+          <div class="toggle-sw"></div>
+          <div>
+            <div class="toggle-label">Solo assegnazioni</div>
+            <div class="toggle-ops">= &nbsp;&nbsp; S</div>
+          </div>
+        </div>
+        <div class="assign-toggle" id="app-comment-toggle" onclick="toggleAppComment()" style="border-color:rgba(240,201,106,0.3); background:rgba(240,201,106,0.04);">
+          <div class="toggle-sw"></div>
+          <div>
+            <div class="toggle-label" style="color:var(--text2);">Solo con commento</div>
+            <div class="toggle-ops">💬</div>
+          </div>
+        </div>
+        <button class="btn-reset" onclick="resetAPP()">↺ Reset</button>
+      </div>
+
+      <div class="results-header">
+        <div class="results-count">Risultati: <strong id="app-count">0</strong></div>
+      </div>
+      <div class="table-wrap">
+        <table id="app-table">
+          <colgroup>
+            <col class="col-view">
+            <col class="col-linea">
+            <col class="col-blocco">
+            <col class="col-seg">
+            <col class="col-idx">
+            <col class="col-op">
+            <col style="width:180px">
+            <col style="width:110px">
+            <col class="col-testo">
+          </colgroup>
+          <thead><tr>
+            <th></th>
+            <th onclick="sortAPP('linea')">Linea<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortAPP('blocco')">Blocco<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortAPP('segmento')">Segmento<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortAPP('numero')">N°<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th>Op.<div class="col-resize"></div></th>
+            <th onclick="sortAPP('commento')">Commento<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th onclick="sortAPP('sorgente')">Sorgente<span class="sa">↕</span><div class="col-resize"></div></th>
+            <th>Istruzione<div class="col-resize"></div></th>
+          </tr></thead>
+          <tbody id="app-tbody"></tbody>
+        </table>
+      </div>
+      <div class="no-results" id="app-empty" style="display:none">Nessun risultato</div>
+    </div>
+
+    <!-- CONFRONTO PANEL -->
+    <div class="panel" id="panel-diff">
+      <div style="display:flex;gap:24px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <div class="section-title" style="margin:0">Confronto VS_Pos · Excel vs PDF</div>
+        <div class="diff-legend">
+          <div class="diff-legend-item"><div class="diff-dot added"></div>Nuovo nel PDF</div>
+          <div class="diff-legend-item"><div class="diff-dot removed"></div>Solo nell'Excel</div>
+          <div class="diff-legend-item"><div class="diff-dot changed"></div>Commento cambiato</div>
+          <div class="diff-legend-item"><div class="diff-dot same"></div>Invariato</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+            <input type="checkbox" id="diff-hide-same" onchange="renderDiff()" style="accent-color:var(--accent)">
+            Nascondi invariati
+          </label>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Stato</th>
+            <th>Asse</th>
+            <th>VS_Pos[n]</th>
+            <th>Blocco</th>
+            <th>Commento Excel</th>
+            <th>Commento PDF</th>
+            <th>Op. Excel</th>
+            <th>Op. PDF</th>
+          </tr></thead>
+          <tbody id="diff-vs-tbody"></tbody>
+        </table>
+      </div>
+      <div class="no-results" id="diff-empty" style="display:none">Carica un Excel e un PDF per vedere il confronto</div>
+
+      <div class="section-title" style="margin-top:28px">Confronto additionalPiecePresence · Excel vs PDF</div>
+      <div class="table-wrap" style="margin-top:10px">
+        <table>
+          <thead><tr>
+            <th>Stato</th>
+            <th>N°</th>
+            <th>Blocco</th>
+            <th>Commento Excel</th>
+            <th>Commento PDF</th>
+            <th>Op. Excel</th>
+            <th>Op. PDF</th>
+          </tr></thead>
+          <tbody id="diff-app-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /analysis -->
+
+</div><!-- /container -->
+
+<!-- ===== TIA PROJECT SELECTION MODAL ===== -->
+<div id="tia-modal" onclick="if(event.target===this) closeTiaModal()">
+  <div class="tia-modal-box">
+    <div class="tia-modal-head">
+      <h3>📡 Seleziona il progetto TIA Portal</h3>
+      <button class="tia-modal-x" onclick="closeTiaModal()">&times;</button>
+    </div>
+    <div class="tia-modal-sub">Sono stati rilevati più progetti aperti. Scegli quale analizzare:</div>
+    <div id="tia-proj-list"></div>
+  </div>
+</div>
+
+<!-- ===== PDF MODAL ===== -->
+<div id="pdf-modal" onclick="if(event.target===this) closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">—</div>
+      <div class="modal-nav">
+        <button id="modal-prev" onclick="modalNav(-1)">◀ Prec.</button>
+        <span class="modal-page-info" id="modal-page-info">Pag. — / —</span>
+        <button id="modal-next" onclick="modalNav(+1)">Succ. ▶</button>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-match-bar" id="modal-match-bar">
+      Variabile: <span id="modal-var-text">—</span>
+    </div>
+    <div class="modal-canvas-wrap" id="modal-canvas-wrap">
+      <div class="modal-loading" id="modal-loading">Caricamento pagina...</div>
+      <canvas id="pdf-canvas" style="display:none"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── PDF.js setup ───────────────────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let VS_DATA = [], APP_DATA = [];
+let pdfDoc = null;
+let vsSort = {key:'linea', dir:1};
+let appSort = {key:'linea', dir:1};
+let vsAssignOnly = true;
+let appAssignOnly = true;
+let vsCommentOnly = false;
+let appCommentOnly = false;
+
+function toggleAssign(panel) {
+  if (panel === 'vs') {
+    vsAssignOnly = !vsAssignOnly;
+    document.getElementById('vs-assign-toggle').classList.toggle('on', vsAssignOnly);
+    renderVS();
+  } else {
+    appAssignOnly = !appAssignOnly;
+    document.getElementById('app-assign-toggle').classList.toggle('on', appAssignOnly);
+    renderAPP();
+  }
+}
+
+function toggleVsComment() {
+  vsCommentOnly = !vsCommentOnly;
+  const el = document.getElementById('vs-comment-toggle');
+  el.classList.toggle('on', vsCommentOnly);
+  if (vsCommentOnly) {
+    el.style.borderColor = 'rgba(240,201,106,0.6)';
+    el.style.background  = 'rgba(240,201,106,0.1)';
+    el.querySelector('.toggle-label').style.color = '#f0c96a';
+    el.querySelector('.toggle-sw').style.background = 'rgba(240,201,106,0.3)';
+    el.querySelector('.toggle-sw').style.borderColor = '#f0c96a';
+  } else {
+    el.style.borderColor = 'rgba(240,201,106,0.3)';
+    el.style.background  = 'rgba(240,201,106,0.04)';
+    el.querySelector('.toggle-label').style.color = 'var(--text2)';
+    el.querySelector('.toggle-sw').style.background = '';
+    el.querySelector('.toggle-sw').style.borderColor = '';
+  }
+  renderVS();
+}
+
+function toggleAppComment() {
+  appCommentOnly = !appCommentOnly;
+  const el = document.getElementById('app-comment-toggle');
+  el.classList.toggle('on', appCommentOnly);
+  if (appCommentOnly) {
+    el.style.borderColor = 'rgba(240,201,106,0.6)';
+    el.style.background  = 'rgba(240,201,106,0.1)';
+    el.querySelector('.toggle-label').style.color = '#f0c96a';
+    el.querySelector('.toggle-sw').style.background = 'rgba(240,201,106,0.3)';
+    el.querySelector('.toggle-sw').style.borderColor = '#f0c96a';
+  } else {
+    el.style.borderColor = 'rgba(240,201,106,0.3)';
+    el.style.background  = 'rgba(240,201,106,0.04)';
+    el.querySelector('.toggle-label').style.color = 'var(--text2)';
+    el.querySelector('.toggle-sw').style.background = '';
+    el.querySelector('.toggle-sw').style.borderColor = '';
+  }
+  renderAPP();
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  if (f.type === 'application/pdf' || f.name.endsWith('.pdf')) processPDF(f);
+  else if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
+    // simulate handleXlsx
+    const fakeEvt = { target: { files: [f], value: '' } };
+    handleXlsx(fakeEvt);
+  } else alert('Trascina un file PDF o un Excel esportato da TIA Var Analyzer.');
+});
+
+function handleFile(e) {
+  const f = e.target.files[0];
+  if (f) processPDF(f);
+  e.target.value = '';
+}
+
+// ─── PDF PROCESSING ──────────────────────────────────────────────────────────
+async function processPDF(file, appendMode = false) {
+  if (!appendMode) {
+    VS_DATA = []; APP_DATA = []; SOURCES = []; pdfDoc = null;
+  }
+  document.getElementById('dropzone').style.display = 'none';
+  const ps = document.getElementById('progress-section');
+  ps.style.display = 'block';
+  if (!appendMode) {
+    document.getElementById('info-bar').style.display = 'none';
+    document.getElementById('analysis').style.display = 'none';
+  }
+
+  document.getElementById('prog-file').textContent = file.name;
+  setProgress(0, 'Lettura file...');
+
+  const arrayBuffer = await file.arrayBuffer();
+  setProgress(2, 'Caricamento PDF...');
+
+  let pdf;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  } catch(err) {
+    alert('Errore lettura PDF: ' + err.message);
+    if (!appendMode) resetAll();
+    ps.style.display = 'none';
+    return;
+  }
+  if (!appendMode) pdfDoc = pdf;  // only first PDF drives the modal viewer
+
+  const numPages = pdf.numPages;
+  document.getElementById('st-pag').textContent = numPages;
+
+  const allLines = [];
+  for (let p = 1; p <= numPages; p++) {
+    const pct = 5 + Math.round((p / numPages) * 80);
+    if (p % 10 === 0 || p === numPages)
+      setProgress(pct, `Pagina ${p} / ${numPages}`);
+    try {
+      const page  = await pdf.getPage(p);
+      const tc    = await page.getTextContent();
+      const items = tc.items;
+      if (!items.length) continue;
+      const rows = {};
+      for (const it of items) {
+        if (!it.str) continue;
+        const y = Math.round(it.transform[5]);
+        if (!rows[y]) rows[y] = [];
+        rows[y].push({ x: it.transform[4], str: it.str });
+      }
+      const sortedYs = Object.keys(rows).map(Number).sort((a,b) => b - a);
+      for (const y of sortedYs) {
+        const parts = rows[y].sort((a,b) => a.x - b.x).map(i => i.str);
+        const text = parts.join(' ').replace(/\s+/g, ' ').trim();
+        if (text) allLines.push({ text, page: p });
+      }
+    } catch(_) {}
+  }
+
+  setProgress(87, 'Analisi variabili...');
+  const { vsData, appData, blocks, tiaVersion, projectName } = analyzeLines(allLines);
+
+  // Tag every record with source filename
+  vsData.forEach(r  => r.sorgente = file.name);
+  appData.forEach(r => r.sorgente = file.name);
+
+  VS_DATA  = [...VS_DATA,  ...vsData];
+  APP_DATA = [...APP_DATA, ...appData];
+  SOURCES.push({ name: file.name, type:'pdf', vsCount: vsData.length, appCount: appData.length });
+
+  let tiaVer = tiaVersion || '—';
+  if (tiaVer==='—') {
+    const fext = file.name.match(/\.zap(\d+)/i);
+    if (fext) tiaVer = 'TIA v' + fext[1];
+  }
+  const projName = projectName || file.name.replace(/\.[^.]+$/, '').replace(/_\d{8}_\d{4}$/, '');
+
+  setProgress(100, 'Completato!');
+  await sleep(400);
+  ps.style.display = 'none';
+
+  finalizeLoad(appendMode ? null : projName, file.name, numPages, blocks, tiaVer);
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-status').textContent = msg;
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ─── ANALYSIS ENGINE ─────────────────────────────────────────────────────────
+function analyzeLines(lines) {
+  // VS_Pos — regex semplicissimo: cerca vspos[ o vs_pos[ ovunque nella riga
+  // Cattura l'asse dal [...] che lo precede immediatamente
+  // Funziona con qualsiasi prefisso: Asse, Asse111, Asse105, Gripper, ecc.
+  const VS_RE1 = /\[([^\]]+)\]\s*\.\s*vs_?pos\[(\d+)\]/gi;
+  // Non serve VS_RE2 — il pattern sopra cattura già tutto
+  // additionalPiecePresence — cerca solo il suffisso ovunque nella riga
+  // (ignora prefisso DB/variabile, cattura solo il numero finale 1-8)
+  const APP_RE = /additionalPiecePresence([1-8])\b/gi;
+  const BLK_RE = /^(\S+)\s+\[((?:FC|FB|OB|DB)\d+)\]$/;
+  const SEG_RE = /^Segmento\s+\d+/;
+
+  let curBlock = 'N/A', curSeg = 'N/A';
+  let blocks = 0;
+  let tiaVersion = '', projectName = '';
+
+  // Extract inline comment //... from a line, following continuation onto next line
+  // Continuation: next line starts with spaces only (no 4-digit instruction number)
+  function extractComment(lines, idx) {
+    const line = lines[idx].text;
+    const cm = line.match(/\/\/(.+)$/);
+    if (!cm) return '';
+    let comment = cm[1].trim();
+    // If line was word-wrapped with hyphen, join with next line
+    if (comment.endsWith('-')) {
+      comment = comment.slice(0, -1).trimEnd();
+      const next = lines[idx + 1];
+      if (next && /^\s{2,}/.test(next.text) && !/^\s*\d{4}\s/.test(next.text)) {
+        comment += next.text.trim();
+      }
+    } else {
+      // No hyphen but next line may still be a continuation (pure indent, no //)
+      const next = lines[idx + 1];
+      if (next && /^\s{2,}/.test(next.text) && !/^\s*\d{4}\s/.test(next.text) && !next.text.includes('//')) {
+        const extra = next.text.trim();
+        if (extra.length > 1 && /^[a-zA-Z]/.test(extra)) comment += ' ' + extra;
+      }
+    }
+    return comment;
+  }
+
+  const vsData  = [];
+  const appData = [];
+
+  // Extract operation token (handles = which is not \w)
+  function getOp(l) {
+    const m = l.match(/^\d+\s+(=|S|R|\w{1,4})\s/);
+    return m ? m[1] : '';
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const { text: line, page: pagina } = lines[i];
+    const ltrim = line.trim();
+
+    // Detect block header
+    const bm = ltrim.match(BLK_RE);
+    if (bm) { curBlock = bm[1]; curSeg = 'N/A'; blocks++; continue; }
+
+    // Detect segment
+    if (SEG_RE.test(ltrim)) { curSeg = ltrim; continue; }
+
+    // Detect TIA version
+    if (!tiaVersion && ltrim.includes('Totally Integrated Automation Portal')) {
+      for (let k = i+1; k < Math.min(i+5, lines.length); k++) {
+        const vm = lines[k].text.match(/V(\d+\.\d+)/);
+        if (vm) { tiaVersion = 'TIA v' + vm[1]; break; }
+      }
+    }
+
+    // Detect project name
+    if (!projectName) {
+      const pm = ltrim.match(/^Nome\s+(\S{6,})/);
+      if (pm && !/^(Input|Output|InOut|Temp|Static|Return)$/.test(pm[1])) {
+        projectName = pm[1];
+      }
+    }
+
+    // VS_Pos — trova [asse].vspos[N] ovunque nella riga
+    let vm2;
+    VS_RE1.lastIndex = 0;
+    while ((vm2 = VS_RE1.exec(line)) !== null) {
+      const asse = vm2[1].trim().replace(/^"|"$/g,'');
+      vsData.push({
+        linea: i + 1, pagina,
+        asse, indice: parseInt(vm2[2]),
+        blocco: curBlock, segmento: curSeg,
+        operazione: getOp(ltrim),
+        testo: ltrim.substring(0, 160),
+        commento: extractComment(lines, i)
+      });
+    }
+
+    // additionalPiecePresence — cerca il suffisso ovunque nella riga
+    APP_RE.lastIndex = 0;
+    let am;
+    while ((am = APP_RE.exec(line)) !== null) {
+      // Salta righe intere commentate (// all'inizio)
+      if (ltrim.startsWith('//')) continue;
+      // Commento inline valido solo se // viene DOPO la variabile
+      const commentPos = line.indexOf('//');
+      const commento = (commentPos > am.index && commentPos >= 0)
+        ? extractComment(lines, i) : '';
+      appData.push({
+        linea: i + 1,
+        pagina,
+        numero: parseInt(am[1]),
+        blocco: curBlock, segmento: curSeg,
+        operazione: getOp(ltrim),
+        testo: ltrim.substring(0, 160),
+        commento
+      });
+    }
+  }
+
+  return { vsData, appData, blocks, tiaVersion, projectName };
+}
+
+// ─── VS FILTERS & RENDER ────────────────────────────────────────────────────
+// ─── STATE EXTRA ─────────────────────────────────────────────────────────────
+let SOURCES = [];       // [{name, type:'pdf'|'xlsx', vsCount, appCount}]
+let DIFF_DATA = [];     // risultato confronto VS
+let DIFF_APP_DATA = []; // risultato confronto APP
+
+// ─── TAB ─────────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(e => e.classList.remove('active'));
+  const tabEl = document.querySelector(
+    t==='vs' ? '.vs-tab' : t==='app' ? '.app-tab' : '.diff-tab');
+  if (tabEl) tabEl.classList.add('active');
+  document.getElementById('panel-'+t).classList.add('active');
+}
+
+// ─── GLOBAL SEARCH ───────────────────────────────────────────────────────────
+function onGlobalSearch() {
+  const q = document.getElementById('global-search').value.trim().toLowerCase();
+  if (!q) return;
+  // Set search in both panels
+  document.getElementById('vs-search').value = q;
+  document.getElementById('app-search').value = q;
+  renderVS(); renderAPP();
+}
+
+// ─── RENDER VS row — add sorgente cell ───────────────────────────────────────
+function getVsFiltered() {
+  const asse    = document.getElementById('vs-asse').value;
+  const idx     = document.getElementById('vs-idx').value;
+  const blocco  = document.getElementById('vs-blocco').value;
+  const sorg    = document.getElementById('vs-sorgente').value;
+  const q       = document.getElementById('vs-search').value.trim().toLowerCase();
+  const gq      = document.getElementById('global-search').value.trim().toLowerCase();
+  const search  = q || gq;
+  return VS_DATA.filter(r =>
+    (vsAssignOnly  ? (r.operazione === '=' || r.operazione === 'S') : true) &&
+    (vsCommentOnly ? !!r.commento : true) &&
+    (!asse   || r.asse === asse) &&
+    (!idx    || r.indice == idx) &&
+    (!blocco || r.blocco === blocco) &&
+    (!sorg   || r.sorgente === sorg) &&
+    (!search || [r.testo, r.blocco, r.asse, r.segmento, r.commento||'', r.sorgente||''].some(s => s.toLowerCase().includes(search)))
+  );
+}
+
+function renderVS() {
+  const q = document.getElementById('vs-search').value.trim() ||
+            document.getElementById('global-search').value.trim();
+  const data = getVsFiltered().slice().sort((a,b) => cmp(a,b,vsSort));
+  const tbody = document.getElementById('vs-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('vs-count').textContent = data.length;
+  document.getElementById('tc-vs').textContent    = data.length;
+  document.getElementById('vs-empty').style.display = data.length ? 'none' : 'block';
+  const multiSrc = SOURCES.length > 1;
+  for (const r of data) {
+    const tr = document.createElement('tr');
+    const hasPage = r.pagina && pdfDoc;
+    const viewBtn = hasPage
+      ? `<button class="btn-view" title="Apri nel PDF" onclick='openPage(${r.pagina},"${escAttr(r.testo)}")'>🔍</button>`
+      : `<button class="btn-view" style="opacity:0.25;cursor:default" title="Nessun PDF caricato">🔍</button>`;
+    const lineCell = r.pagina
+      ? `${r.linea} <span style="color:var(--text3);font-size:10px">p.${r.pagina}</span>`
+      : `<span style="color:var(--text3)">—</span>`;
+    const srcCell = multiSrc
+      ? `<span class="src-badge ${srcBadgeClass(r.sorgente)}" title="${escHtml(r.sorgente||'')}">${escHtml((r.sorgente||'').replace(/^.+[/\\]/,''))}</span>`
+      : '';
+    tr.innerHTML = `
+      <td style="padding:4px 6px;">${viewBtn}</td>
+      <td><span class="ln">${lineCell}</span></td>
+      <td><span class="bn">${escHtml(r.blocco)}</span></td>
+      <td><div class="sn" title="${escHtml(r.segmento)}">${escHtml(r.segmento)}</div></td>
+      <td><span class="tag tag-asse">${escHtml(r.asse)}</span></td>
+      <td><span class="tag tag-idx">${r.indice}</span></td>
+      <td><span class="tag tag-op">${escHtml(r.operazione||'—')}</span></td>
+      <td>${r.commento ? `<span class="tag-comment" title="${escHtml(r.commento)}">💬 ${escHtml(r.commento)}</span>` : '<span style="color:var(--text3);font-size:11px">—</span>'}</td>
+      <td>${srcCell}</td>
+      <td><div class="tc" title="${escHtml(r.testo)}">${hlText(r.testo, q)}</div></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function sortVS(key) {
+  vsSort = vsSort.key===key ? {key, dir:-vsSort.dir} : {key, dir:1};
+  renderVS();
+}
+function resetVS() {
+  ['vs-asse','vs-idx','vs-blocco','vs-sorgente'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('vs-search').value='';
+  document.querySelectorAll('#asse-grid .summary-box').forEach(b => b.classList.remove('sel'));
+  vsAssignOnly = true;
+  document.getElementById('vs-assign-toggle').classList.add('on');
+  vsCommentOnly = true; toggleVsComment();
+  renderVS();
+}
+
+// ─── RENDER APP row — add sorgente cell ──────────────────────────────────────
+function getAppFiltered() {
+  const num    = document.getElementById('app-num').value;
+  const blocco = document.getElementById('app-blocco').value;
+  const sorg   = document.getElementById('app-sorgente').value;
+  const q      = document.getElementById('app-search').value.trim().toLowerCase();
+  const gq     = document.getElementById('global-search').value.trim().toLowerCase();
+  const search = q || gq;
+  return APP_DATA.filter(r =>
+    (appAssignOnly  ? (r.operazione === '=' || r.operazione === 'S') : true) &&
+    (appCommentOnly ? !!r.commento : true) &&
+    (!num    || r.numero == num) &&
+    (!blocco || r.blocco === blocco) &&
+    (!sorg   || r.sorgente === sorg) &&
+    (!search || [r.testo, r.blocco, r.segmento, r.commento||'', r.sorgente||''].some(s => s.toLowerCase().includes(search)))
+  );
+}
+
+function renderAPP() {
+  const q = document.getElementById('app-search').value.trim() ||
+            document.getElementById('global-search').value.trim();
+  const data = getAppFiltered().slice().sort((a,b) => cmp(a,b,appSort));
+  const tbody = document.getElementById('app-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('app-count').textContent = data.length;
+  document.getElementById('tc-app').textContent    = data.length;
+  document.getElementById('app-empty').style.display = data.length ? 'none' : 'block';
+  const multiSrc = SOURCES.length > 1;
+  for (const r of data) {
+    const tr = document.createElement('tr');
+    const hasPage = r.pagina && pdfDoc;
+    const viewBtn = hasPage
+      ? `<button class="btn-view" title="Apri nel PDF" onclick='openPage(${r.pagina},"${escAttr(r.testo)}")'>🔍</button>`
+      : `<button class="btn-view" style="opacity:0.25;cursor:default" title="Nessun PDF caricato">🔍</button>`;
+    const lineCell = r.pagina
+      ? `${r.linea} <span style="color:var(--text3);font-size:10px">p.${r.pagina}</span>`
+      : `<span style="color:var(--text3)">—</span>`;
+    const srcCell = multiSrc
+      ? `<span class="src-badge ${srcBadgeClass(r.sorgente)}" title="${escHtml(r.sorgente||'')}">${escHtml((r.sorgente||'').replace(/^.+[/\\]/,''))}</span>`
+      : '';
+    tr.innerHTML = `
+      <td style="padding:4px 6px;">${viewBtn}</td>
+      <td><span class="ln">${lineCell}</span></td>
+      <td><span class="bn">${escHtml(r.blocco)}</span></td>
+      <td><div class="sn" title="${escHtml(r.segmento)}">${escHtml(r.segmento)}</div></td>
+      <td><span class="tag tag-num">${r.numero}</span></td>
+      <td><span class="tag tag-op">${escHtml(r.operazione||'—')}</span></td>
+      <td>${r.commento ? `<span class="tag-comment" title="${escHtml(r.commento)}">💬 ${escHtml(r.commento)}</span>` : '<span style="color:var(--text3);font-size:11px">—</span>'}</td>
+      <td>${srcCell}</td>
+      <td><div class="tc" title="${escHtml(r.testo)}">${hlText(r.testo, q)}</div></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function sortAPP(key) {
+  appSort = appSort.key===key ? {key, dir:-appSort.dir} : {key, dir:1};
+  renderAPP();
+}
+function resetAPP() {
+  ['app-num','app-blocco','app-sorgente'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('app-search').value='';
+  document.querySelectorAll('#num-grid .summary-box').forEach(b => b.classList.remove('sel'));
+  appAssignOnly = true;
+  document.getElementById('app-assign-toggle').classList.add('on');
+  appCommentOnly = true; toggleAppComment();
+  renderAPP();
+}
+
+// ─── BUILD FILTERS (with sorgente) ───────────────────────────────────────────
+function buildVsFilters() {
+  const assi    = [...new Set(VS_DATA.map(r=>r.asse))].sort();
+  const idxs    = [...new Set(VS_DATA.map(r=>r.indice))].sort((a,b)=>a-b);
+  const blocchi = [...new Set(VS_DATA.map(r=>r.blocco))].sort();
+  const sorgenti= [...new Set(VS_DATA.map(r=>r.sorgente).filter(Boolean))].sort();
+
+  resetSelect('vs-asse',     assi,     a => a);
+  resetSelect('vs-idx',      idxs,     i => '['+i+']');
+  resetSelect('vs-blocco',   blocchi,  b => b);
+  resetSelect('vs-sorgente', sorgenti, s => s.replace(/^.+[/\\]/,''));
+
+  // show/hide sorgente filter
+  document.getElementById('vs-sorgente-wrap').style.display = sorgenti.length > 1 ? '' : 'none';
+
+  const grid = document.getElementById('asse-grid');
+  grid.innerHTML = '';
+  const cnt = {};
+  VS_DATA.forEach(r => cnt[r.asse] = (cnt[r.asse]||0)+1);
+  assi.forEach(a => {
+    const b = mk('div','summary-box');
+    b.dataset.val = a;
+    b.innerHTML = `<div class="sb-label" title="${escHtml(a)}">${escHtml(a)}</div><div class="sb-count">${cnt[a]}</div>`;
+    b.onclick = () => toggleBox(b, 'vs-asse', '#asse-grid', renderVS);
+    grid.appendChild(b);
+  });
+}
+
+function syncAsseBox() {
+  const v = document.getElementById('vs-asse').value;
+  document.querySelectorAll('#asse-grid .summary-box').forEach(b =>
+    b.classList.toggle('sel', b.dataset.val === v && v !== ''));
+}
+
+function buildAppFilters() {
+  const numeri  = [...new Set(APP_DATA.map(r=>r.numero))].sort((a,b)=>a-b);
+  const blocchi = [...new Set(APP_DATA.map(r=>r.blocco))].sort();
+  const sorgenti= [...new Set(APP_DATA.map(r=>r.sorgente).filter(Boolean))].sort();
+
+  resetSelect('app-num',     numeri,   n => 'Presenza '+n);
+  resetSelect('app-blocco',  blocchi,  b => b);
+  resetSelect('app-sorgente',sorgenti, s => s.replace(/^.+[/\\]/,''));
+
+  document.getElementById('app-sorgente-wrap').style.display = sorgenti.length > 1 ? '' : 'none';
+
+  const grid = document.getElementById('num-grid');
+  grid.innerHTML = '';
+  const cnt = {};
+  APP_DATA.forEach(r => cnt[r.numero] = (cnt[r.numero]||0)+1);
+  numeri.forEach(n => {
+    const b = mk('div','summary-box orange');
+    b.dataset.val = n;
+    b.innerHTML = `<div class="sb-label">additionalPiecePresence<strong>${n}</strong></div><div class="sb-count">${cnt[n]}</div>`;
+    b.onclick = () => toggleBox(b, 'app-num', '#num-grid', renderAPP);
+    grid.appendChild(b);
+  });
+}
+
+function syncNumBox() {
+  const v = document.getElementById('app-num').value;
+  document.querySelectorAll('#num-grid .summary-box').forEach(b =>
+    b.classList.toggle('sel', b.dataset.val == v && v !== ''));
+}
+
+// ─── SOURCES BAR ─────────────────────────────────────────────────────────────
+function updateSourcesBar() {
+  const bar = document.getElementById('sources-bar');
+  if (SOURCES.length <= 1) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = SOURCES.map((s,i) => `
+    <div class="source-chip">
+      <span class="src-badge ${s.type==='xlsx'?'src-xlsx':s.type==='tia'?'src-tia':'src-pdf'}">${s.type.toUpperCase()}</span>
+      <span class="source-chip-name">${escHtml(s.name)}</span>
+      <span class="source-chip-cnt">${s.vsCount} VS · ${s.appCount} APP</span>
+      <button class="source-chip-x" onclick="removeSource(${i})" title="Rimuovi">✕</button>
+    </div>`).join('');
+}
+
+function removeSource(idx) {
+  const name = SOURCES[idx].name;
+  VS_DATA  = VS_DATA.filter(r => r.sorgente !== name);
+  APP_DATA = APP_DATA.filter(r => r.sorgente !== name);
+  SOURCES.splice(idx, 1);
+  updateSourcesBar();
+  buildVsFilters(); buildAppFilters();
+  renderVS(); renderAPP();
+  updateTopbarStats();
+  if (SOURCES.length < 2) { document.getElementById('tab-diff').style.display='none'; DIFF_DATA=[]; DIFF_APP_DATA=[]; }
+}
+
+function updateTopbarStats() {
+  document.getElementById('st-vs').textContent  = VS_DATA.length;
+  document.getElementById('st-app').textContent = APP_DATA.length;
+}
+
+// ─── AGGIUNGI PDF ─────────────────────────────────────────────────────────────
+async function handleAddPDF(e) {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  await processPDF(f, true); // true = append mode
+}
+
+// ─── CARICA XLSX ─────────────────────────────────────────────────────────────
+async function handleXlsx(e) {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const buf = await f.arrayBuffer();
+  const wb  = XLSX.read(buf, {type:'array'});
+
+  const vsSheet  = wb.Sheets['VS_Pos'];
+  const appSheet = wb.Sheets['AddPiecePresence'];
+  if (!vsSheet && !appSheet) { alert('File non riconosciuto — mancano i fogli VS_Pos e AddPiecePresence'); return; }
+
+  const vsRows  = vsSheet  ? XLSX.utils.sheet_to_json(vsSheet)  : [];
+  const appRows = appSheet ? XLSX.utils.sheet_to_json(appSheet) : [];
+
+  const sorgente = f.name;
+  const vsData  = vsRows.map(r => ({
+    sorgente, asse: r['Asse']||'', indice: parseInt(r['VS_Pos[n]'])||0,
+    blocco: r['Blocco']||'', segmento: r['Segmento']||'',
+    operazione: r['Operazione']||'', commento: r['Commento']||'',
+    testo: r['Istruzione']||'', linea: parseInt(r['Linea'])||0, pagina: null
+  }));
+  const appData = appRows.map(r => ({
+    sorgente, numero: parseInt(r['N°'])||0,
+    blocco: r['Blocco']||'', segmento: r['Segmento']||'',
+    operazione: r['Operazione']||'', commento: r['Commento']||'',
+    testo: r['Istruzione']||'', linea: parseInt(r['Linea'])||0, pagina: null
+  }));
+
+  VS_DATA  = [...VS_DATA,  ...vsData];
+  APP_DATA = [...APP_DATA, ...appData];
+  SOURCES.push({ name: sorgente, type:'xlsx', vsCount: vsData.length, appCount: appData.length });
+
+  finalizeLoad();
+}
+
+// ─── MODALITÀ TIA OPENNESS (bridge locale) ───────────────────────────────────
+const TIA_BRIDGE = localStorage.getItem('tiaBridgeUrl') || 'http://127.0.0.1:8731';
+
+async function bridgeFetch(path, timeout = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeout);
+  try { return await fetch(TIA_BRIDGE + path, { signal: ctrl.signal, cache: 'no-store' }); }
+  finally { clearTimeout(t); }
+}
+
+async function loadFromTia() {
+  // 1) il bridge è attivo?
+  try {
+    const r = await bridgeFetch('/ping', 3000);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await r.json();
+  } catch (e) {
+    alert('Bridge TIA non raggiungibile su ' + TIA_BRIDGE + '.\n\n' +
+          'Avvia lo script "tia-bridge.ps1" (cartella tia-bridge) e riprova.\n\n' +
+          'Dettaglio: ' + e.message);
+    return;
+  }
+
+  // 2) progetti aperti
+  let projects = [];
+  try {
+    const r = await bridgeFetch('/projects', 10000);
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'errore sconosciuto');
+    projects = d.projects || [];
+  } catch (e) {
+    alert('Errore nella lettura dei progetti aperti: ' + e.message);
+    return;
+  }
+
+  const valid = projects.filter(p => p.path); // scarta istanze TIA senza progetto
+  if (valid.length === 0) {
+    alert('Nessun progetto TIA Portal aperto.\nApri un progetto in TIA e riprova.');
+    return;
+  }
+
+  // 3) uno solo → diretto; più di uno → popup di selezione
+  let chosen;
+  if (valid.length === 1) chosen = valid[0];
+  else { chosen = await tiaSelectProject(valid); if (!chosen) return; }
+
+  await tiaExport(chosen);
+}
+
+function tiaSelectProject(projects) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('tia-modal');
+    const list  = document.getElementById('tia-proj-list');
+    list.innerHTML = '';
+    let done = false;
+    const finish = (val) => { if (done) return; done = true; modal.classList.remove('open'); resolve(val); };
+
+    projects.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'tia-proj-item';
+      div.innerHTML =
+        `<div class="tia-proj-name">${escHtml(p.name)}</div>
+         <div class="tia-proj-path">${escHtml(p.path || '')} · pid ${escHtml(String(p.pid))} · TIA ${escHtml(p.tiaVersion || '')}</div>`;
+      div.onclick = () => finish(p);
+      list.appendChild(div);
+    });
+    window._tiaModalCancel = () => finish(null);
+    modal.classList.add('open');
+  });
+}
+
+function closeTiaModal() {
+  document.getElementById('tia-modal').classList.remove('open');
+  if (window._tiaModalCancel) window._tiaModalCancel();
+}
+
+async function tiaExport(proj) {
+  document.getElementById('dropzone').style.display = 'none';
+  const ps = document.getElementById('progress-section');
+  ps.style.display = 'block';
+  document.getElementById('info-bar').style.display = 'none';
+  document.getElementById('analysis').style.display = 'none';
+  document.getElementById('prog-file').textContent = proj.name;
+  setProgress(10, 'Connessione a TIA Portal — conferma il popup di sicurezza in TIA...');
+
+  let bundle;
+  try {
+    // export può richiedere parecchio su progetti grandi: timeout ampio
+    const r = await bridgeFetch('/export?pid=' + encodeURIComponent(proj.pid), 600000);
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const e = await r.json(); if (e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
+    bundle = await r.json();
+  } catch (e) {
+    alert('Errore durante l\'export dal progetto: ' + e.message);
+    ps.style.display = 'none';
+    if (SOURCES.length === 0) document.getElementById('dropzone').style.display = '';
+    return;
+  }
+
+  setProgress(90, 'Analisi variabili...');
+  loadBundle(bundle);
+  setProgress(100, 'Completato!');
+  await sleep(350);
+  ps.style.display = 'none';
+}
+
+// Carica un bundle JSON prodotto dal bridge come nuova sorgente "tia"
+function loadBundle(b) {
+  const srcName = (b.project && b.project.name) ? b.project.name : 'Progetto TIA';
+  const vsData = (b.vs || []).map(r => ({
+    sorgente: srcName, asse: r.asse || '', indice: parseInt(r.indice) || 0,
+    blocco: r.blocco || '', segmento: r.segmento || '', operazione: r.operazione || '',
+    commento: r.commento || '', testo: r.testo || '', linea: parseInt(r.linea) || 0, pagina: null
+  }));
+  const appData = (b.app || []).map(r => ({
+    sorgente: srcName, numero: parseInt(r.numero) || 0,
+    blocco: r.blocco || '', segmento: r.segmento || '', operazione: r.operazione || '',
+    commento: r.commento || '', testo: r.testo || '', linea: parseInt(r.linea) || 0, pagina: null
+  }));
+
+  VS_DATA  = [...VS_DATA,  ...vsData];
+  APP_DATA = [...APP_DATA, ...appData];
+  SOURCES.push({ name: srcName, type: 'tia', vsCount: vsData.length, appCount: appData.length });
+
+  // Da un progetto vogliamo vedere TUTTE le occorrenze, non solo le assegnazioni
+  vsAssignOnly = false; appAssignOnly = false;
+  document.getElementById('vs-assign-toggle').classList.remove('on');
+  document.getElementById('app-assign-toggle').classList.remove('on');
+
+  const tiaVer = (b.project && b.project.tiaVersion) ? ('TIA ' + b.project.tiaVersion) : '—';
+  const blocks = (b.stats && b.stats.blocks) || '—';
+  finalizeLoad(srcName, srcName, null, blocks, tiaVer);
+}
+
+// ─── EXPORT EXCEL ─────────────────────────────────────────────────────────────
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+
+  // Foglio Info
+  const infoData = SOURCES.map(s => ({
+    'Sorgente': s.name, 'Tipo': s.type.toUpperCase(),
+    'VS_Pos': s.vsCount, 'AddPiecePresence': s.appCount,
+    'Esportato il': new Date().toLocaleString('it-IT')
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(infoData), 'Info');
+
+  // Foglio VS_Pos
+  const vsRows = VS_DATA.map(r => ({
+    'Sorgente': r.sorgente||'', 'Linea': r.linea, 'Pagina': r.pagina||'',
+    'Blocco': r.blocco, 'Segmento': r.segmento,
+    'Asse': r.asse, 'VS_Pos[n]': r.indice,
+    'Operazione': r.operazione, 'Commento': r.commento||'',
+    'Istruzione': r.testo
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vsRows), 'VS_Pos');
+
+  // Foglio AddPiecePresence
+  const appRows = APP_DATA.map(r => ({
+    'Sorgente': r.sorgente||'', 'Linea': r.linea, 'Pagina': r.pagina||'',
+    'Blocco': r.blocco, 'Segmento': r.segmento,
+    'N°': r.numero,
+    'Operazione': r.operazione, 'Commento': r.commento||'',
+    'Istruzione': r.testo
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(appRows), 'AddPiecePresence');
+
+  const date = new Date().toISOString().slice(0,10);
+  const projName = (SOURCES[0]?.name||'export').replace(/\.[^.]+$/,'');
+  XLSX.writeFile(wb, `TIA_${projName}_${date}.xlsx`);
+}
+
+// ─── DIFF / CONFRONTO ────────────────────────────────────────────────────────
+function computeDiff() {
+  const xlsxSrcs = SOURCES.filter(s=>s.type==='xlsx').map(s=>s.name);
+  const pdfSrcs  = SOURCES.filter(s=>s.type==='pdf'||s.type==='tia').map(s=>s.name);
+  if (!xlsxSrcs.length || !pdfSrcs.length) return;
+
+  const vsXlsx = VS_DATA.filter(r=>xlsxSrcs.includes(r.sorgente));
+  const vsPdf  = VS_DATA.filter(r=>pdfSrcs.includes(r.sorgente));
+
+  // Chiave di confronto: asse + indice + blocco
+  const key = r => `${r.asse}|${r.indice}|${r.blocco}`;
+  const xlsxMap = {};
+  vsXlsx.forEach(r => { xlsxMap[key(r)] = r; });
+  const pdfMap  = {};
+  vsPdf.forEach(r  => { pdfMap[key(r)]  = r; });
+
+  const allKeys = new Set([...Object.keys(xlsxMap), ...Object.keys(pdfMap)]);
+  DIFF_DATA = [];
+  allKeys.forEach(k => {
+    const x = xlsxMap[k], p = pdfMap[k];
+    let status = 'same';
+    if (!x) status = 'added';
+    else if (!p) status = 'removed';
+    else if ((x.commento||'') !== (p.commento||'') || x.operazione !== p.operazione) status = 'changed';
+    const base = x || p;
+    DIFF_DATA.push({ status, asse: base.asse, indice: base.indice, blocco: base.blocco,
+      commXlsx: x?.commento||'', commPdf: p?.commento||'',
+      opXlsx: x?.operazione||'', opPdf: p?.operazione||'' });
+  });
+
+  // APP diff
+  const appXlsx = APP_DATA.filter(r=>xlsxSrcs.includes(r.sorgente));
+  const appPdf  = APP_DATA.filter(r=>pdfSrcs.includes(r.sorgente));
+  const appKey  = r => `${r.numero}|${r.blocco}`;
+  const axMap   = {}; appXlsx.forEach(r => { axMap[appKey(r)] = r; });
+  const apMap   = {}; appPdf.forEach(r  => { apMap[appKey(r)]  = r; });
+  const appKeys = new Set([...Object.keys(axMap), ...Object.keys(apMap)]);
+  DIFF_APP_DATA = [];
+  appKeys.forEach(k => {
+    const x = axMap[k], p = apMap[k];
+    let status = 'same';
+    if (!x) status = 'added';
+    else if (!p) status = 'removed';
+    else if ((x.commento||'') !== (p.commento||'') || x.operazione !== p.operazione) status = 'changed';
+    const base = x || p;
+    DIFF_APP_DATA.push({ status, numero: base.numero, blocco: base.blocco,
+      commXlsx: x?.commento||'', commPdf: p?.commento||'',
+      opXlsx: x?.operazione||'', opPdf: p?.operazione||'' });
+  });
+
+  const changed = DIFF_DATA.filter(r=>r.status!=='same').length +
+                  DIFF_APP_DATA.filter(r=>r.status!=='same').length;
+  document.getElementById('tc-diff').textContent = changed || '✓';
+  document.getElementById('tab-diff').style.display = '';
+  renderDiff();
+}
+
+function renderDiff() {
+  const hideS = document.getElementById('diff-hide-same')?.checked;
+
+  const vsBody = document.getElementById('diff-vs-tbody');
+  vsBody.innerHTML = '';
+  const vsRows = hideS ? DIFF_DATA.filter(r=>r.status!=='same') : DIFF_DATA;
+  vsRows.sort((a,b) => { const o={added:0,removed:1,changed:2,same:3}; return o[a.status]-o[b.status]; });
+  vsRows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.className = 'diff-'+r.status;
+    tr.innerHTML = `
+      <td><span class="diff-status ${r.status}">${{added:'＋Nuovo',removed:'－Solo XLS',changed:'≠ Cambiato',same:'= Uguale'}[r.status]}</span></td>
+      <td><span class="tag tag-asse">${escHtml(r.asse)}</span></td>
+      <td><span class="tag tag-idx">${r.indice}</span></td>
+      <td><span class="bn">${escHtml(r.blocco)}</span></td>
+      <td>${r.commXlsx ? `<span class="tag-comment">💬 ${escHtml(r.commXlsx)}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.commPdf  ? `<span class="tag-comment">💬 ${escHtml(r.commPdf)}</span>`  : '<span style="color:var(--text3)">—</span>'}</td>
+      <td><span class="tag tag-op">${escHtml(r.opXlsx||'—')}</span></td>
+      <td><span class="tag tag-op">${escHtml(r.opPdf||'—')}</span></td>`;
+    vsBody.appendChild(tr);
+  });
+
+  const appBody = document.getElementById('diff-app-tbody');
+  appBody.innerHTML = '';
+  const appRows = hideS ? DIFF_APP_DATA.filter(r=>r.status!=='same') : DIFF_APP_DATA;
+  appRows.sort((a,b) => { const o={added:0,removed:1,changed:2,same:3}; return o[a.status]-o[b.status]; });
+  appRows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.className = 'diff-'+r.status;
+    tr.innerHTML = `
+      <td><span class="diff-status ${r.status}">${{added:'＋Nuovo',removed:'－Solo XLS',changed:'≠ Cambiato',same:'= Uguale'}[r.status]}</span></td>
+      <td><span class="tag tag-num">${r.numero}</span></td>
+      <td><span class="bn">${escHtml(r.blocco)}</span></td>
+      <td>${r.commXlsx ? `<span class="tag-comment">💬 ${escHtml(r.commXlsx)}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.commPdf  ? `<span class="tag-comment">💬 ${escHtml(r.commPdf)}</span>`  : '<span style="color:var(--text3)">—</span>'}</td>
+      <td><span class="tag tag-op">${escHtml(r.opXlsx||'—')}</span></td>
+      <td><span class="tag tag-op">${escHtml(r.opPdf||'—')}</span></td>`;
+    appBody.appendChild(tr);
+  });
+
+  document.getElementById('diff-empty').style.display = (vsRows.length || appRows.length) ? 'none' : 'block';
+}
+
+// ─── FINALIZELOAD — called after any source is added ─────────────────────────
+function finalizeLoad(projName, fileName, numPages, blocks, tiaVer) {
+  updateTopbarStats();
+  buildVsFilters();
+  buildAppFilters();
+  renderVS();
+  renderAPP();
+  updateSourcesBar();
+  initResizeAfterRender();
+  document.getElementById('btn-export').disabled = false;
+  document.getElementById('btn-add-pdf').disabled = false;
+  document.getElementById('info-bar').style.display = 'flex';
+  document.getElementById('analysis').style.display = 'block';
+  // Compute diff if we have both xlsx and pdf
+  const hasXlsx = SOURCES.some(s=>s.type==='xlsx');
+  const hasPdf  = SOURCES.some(s=>s.type==='pdf'||s.type==='tia');
+  if (hasXlsx && hasPdf) computeDiff();
+  else { document.getElementById('tab-diff').style.display='none'; }
+  // Update info bar if first load
+  if (projName) {
+    document.getElementById('inf-project').textContent = projName;
+    document.getElementById('inf-file').textContent    = fileName;
+    document.getElementById('inf-pages').textContent   = numPages||'—';
+    document.getElementById('inf-blocks').textContent  = blocks||'—';
+    document.getElementById('inf-date').textContent    = new Date().toLocaleString('it-IT');
+    document.getElementById('inf-tia').textContent     = tiaVer||'—';
+    document.getElementById('topbar-info').innerHTML   =
+      `<strong>${escHtml(projName)}</strong> &nbsp;·&nbsp; ${SOURCES.length} sorgent${SOURCES.length===1?'e':'i'} &nbsp;·&nbsp; ${VS_DATA.length} VS · ${APP_DATA.length} APP`;
+  } else {
+    document.getElementById('topbar-info').innerHTML =
+      `${SOURCES.length} sorgent${SOURCES.length===1?'e':'i'} &nbsp;·&nbsp; ${VS_DATA.length} VS · ${APP_DATA.length} APP`;
+  }
+}
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+function resetAll() {
+  VS_DATA=[]; APP_DATA=[]; pdfDoc=null; SOURCES=[]; DIFF_DATA=[]; DIFF_APP_DATA=[];
+  vsAssignOnly=true; appAssignOnly=true; vsCommentOnly=false; appCommentOnly=false;
+  document.getElementById('vs-assign-toggle').classList.add('on');
+  document.getElementById('app-assign-toggle').classList.add('on');
+  document.getElementById('dropzone').style.display = '';
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('info-bar').style.display = 'none';
+  document.getElementById('sources-bar').style.display = 'none';
+  document.getElementById('analysis').style.display = 'none';
+  document.getElementById('tab-diff').style.display = 'none';
+  document.getElementById('btn-export').disabled = true;
+  document.getElementById('btn-add-pdf').disabled = true;
+  document.getElementById('global-search').value = '';
+  document.getElementById('topbar-info').textContent = 'Nessun file caricato — trascina un PDF o un Excel esportato';
+  ['st-vs','st-app','st-pag'].forEach(id => document.getElementById(id).textContent='—');
+  ['vs-asse','vs-idx','vs-blocco','vs-sorgente','app-num','app-blocco','app-sorgente'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) while (el.options.length > 1) el.remove(1);
+  });
+  ['vs-tbody','app-tbody','asse-grid','num-grid','diff-vs-tbody','diff-app-tbody'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+}
+
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function cmp(a, b, sort) {
+  const va = a[sort.key], vb = b[sort.key];
+  return (va < vb ? -1 : va > vb ? 1 : 0) * sort.dir;
+}
+
+function resetSelect(id, values, labelFn) {
+  const el = document.getElementById(id);
+  while (el.options.length > 1) el.remove(1);
+  values.forEach(v => el.add(new Option(labelFn(v), v)));
+}
+
+function toggleBox(box, selectId, gridSel, renderFn) {
+  const val = box.dataset.val;
+  const sel = document.getElementById(selectId);
+  const isActive = box.classList.contains('sel');
+  document.querySelectorAll(gridSel + ' .summary-box').forEach(b => b.classList.remove('sel'));
+  if (isActive) { sel.value = ''; }
+  else { box.classList.add('sel'); sel.value = val; }
+  renderFn();
+}
+
+function mk(tag, cls) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  return el;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Classe del badge sorgente: deriva il tipo dalla voce in SOURCES (fallback su estensione)
+function srcBadgeClass(name) {
+  const s = SOURCES.find(x => x.name === name);
+  const t = s ? s.type : (name && name.endsWith('.xlsx') ? 'xlsx' : 'pdf');
+  return t === 'xlsx' ? 'src-xlsx' : t === 'tia' ? 'src-tia' : 'src-pdf';
+}
+
+function escAttr(s) {
+  if (!s) return '';
+  return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/'/g,"\\'");
+}
+
+function hlText(text, term) {
+  if (!term) return escHtml(text);
+  const idx = text.toLowerCase().indexOf(term.toLowerCase());
+  if (idx < 0) return escHtml(text);
+  return escHtml(text.slice(0,idx))
+    + '<span class="hl">' + escHtml(text.slice(idx, idx+term.length)) + '</span>'
+    + escHtml(text.slice(idx+term.length));
+}
+
+// ─── PDF MODAL ───────────────────────────────────────────────────────────────
+let modalPage = 1;
+let modalTotalPages = 0;
+let modalVarText = '';
+
+async function openPage(page, varText) {
+  if (!pdfDoc) return;
+  modalPage = page;
+  modalTotalPages = pdfDoc.numPages;
+  modalVarText = varText;
+
+  document.getElementById('pdf-modal').classList.add('open');
+  document.getElementById('modal-var-text').textContent = varText;
+  document.body.style.overflow = 'hidden';
+
+  await renderPdfPage(modalPage);
+}
+
+function closeModal() {
+  document.getElementById('pdf-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function modalNav(delta) {
+  const newPage = modalPage + delta;
+  if (newPage < 1 || newPage > modalTotalPages) return;
+  modalPage = newPage;
+  await renderPdfPage(modalPage);
+}
+
+async function renderPdfPage(pageNum) {
+  const loading = document.getElementById('modal-loading');
+  const canvas  = document.getElementById('pdf-canvas');
+  loading.style.display = 'flex';
+  canvas.style.display  = 'none';
+
+  // Nav buttons
+  document.getElementById('modal-prev').disabled = pageNum <= 1;
+  document.getElementById('modal-next').disabled = pageNum >= modalTotalPages;
+  document.getElementById('modal-page-info').textContent = `Pag. ${pageNum} / ${modalTotalPages}`;
+  document.getElementById('modal-title').innerHTML =
+    `PDF · <strong>Pagina ${pageNum}</strong> di ${modalTotalPages}`;
+
+  try {
+    const page     = await pdfDoc.getPage(pageNum);
+    const wrapW    = document.getElementById('modal-canvas-wrap').clientWidth - 32;
+    const viewport = page.getViewport({ scale: 1 });
+    const scale    = Math.min(2.2, wrapW / viewport.width);
+    const vp       = page.getViewport({ scale });
+
+    canvas.width  = vp.width;
+    canvas.height = vp.height;
+
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+    loading.style.display = 'none';
+    canvas.style.display  = 'block';
+  } catch(e) {
+    loading.textContent = 'Errore rendering pagina: ' + e.message;
+  }
+}
+
+// Keyboard navigation in modal
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('pdf-modal').classList.contains('open')) return;
+  if (e.key === 'Escape')       closeModal();
+  if (e.key === 'ArrowRight')   modalNav(+1);
+  if (e.key === 'ArrowLeft')    modalNav(-1);
+});
+
+// ─── RESIZABLE COLUMNS ───────────────────────────────────────────────────────
+function initResizableColumns() {
+  document.querySelectorAll('th .col-resize').forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const th = handle.closest('th');
+      const startX = e.pageX;
+      const startW = th.offsetWidth;
+      handle.classList.add('dragging');
+
+      function onMove(ev) {
+        const newW = Math.max(40, startW + ev.pageX - startX);
+        th.style.width = newW + 'px';
+        // also set on corresponding col if present
+        const thIndex = [...th.parentElement.children].indexOf(th);
+        const table = th.closest('table');
+        const cols = table.querySelectorAll('col');
+        if (cols[thIndex]) cols[thIndex].style.width = newW + 'px';
+      }
+
+      function onUp() {
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // prevent click on resize from triggering th sort
+    handle.addEventListener('click', e => e.stopPropagation());
+  });
+}
+
+// Init resize after DOM ready — runs once headers exist in DOM
+document.addEventListener('DOMContentLoaded', initResizableColumns);
+// Also call after analysis renders so new tables are covered
+function initResizeAfterRender() { setTimeout(initResizableColumns, 50); }
+
+/* ========== AUTO-UPDATE CHECK (public repo — no token needed) ========== */
+const APP_VERSION='2.4';
+(function(){
+  const REPO_OWNER='lucacalcabrini';
+  const REPO_NAME='TiaProgramSerch';
+  const VERSION_FILE='version.json';
+  const CURRENT_VERSION=APP_VERSION;
+
+  const banner=document.createElement('div');
+  banner.className='update-banner';
+  banner.id='updateBanner';
+  banner.innerHTML='<span id="updateMsg"></span><a id="updateDownload" href="#">⬇ Scarica aggiornamento</a><button class="update-close" onclick="document.getElementById(\'updateBanner\').style.display=\'none\'">&times;</button>';
+  document.body.appendChild(banner);
+
+  function compareVersions(a,b){
+    const pa=a.split('.').map(Number), pb=b.split('.').map(Number);
+    for(let i=0;i<Math.max(pa.length,pb.length);i++){
+      const na=pa[i]||0, nb=pb[i]||0;
+      if(na<nb) return -1;
+      if(na>nb) return 1;
+    }
+    return 0;
+  }
+
+  async function checkForUpdate(){
+    try{
+      const resp=await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${VERSION_FILE}`,{
+        headers:{'Accept':'application/vnd.github.v3.raw'}
+      });
+      if(!resp.ok){console.warn('[AutoUpdate] Impossibile controllare:',resp.status);return;}
+      const data=JSON.parse(await resp.text());
+      if(data.version && compareVersions(CURRENT_VERSION,data.version)<0){
+        document.getElementById('updateMsg').textContent=`🚀 Nuova versione disponibile: v${data.version} (tu hai v${CURRENT_VERSION})`;
+        const dlBtn=document.getElementById('updateDownload');
+        dlBtn.onclick=async function(e){
+          e.preventDefault();
+          try{
+            const fname=data.filename||'TIA_Analisi_Variabili_v'+data.version+'.html';
+            const r=await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${fname}`,{
+              headers:{'Accept':'application/vnd.github.v3.raw'}
+            });
+            if(!r.ok){alert('Errore nel download: '+r.status);return;}
+            const blob=await r.blob();
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+            URL.revokeObjectURL(url);
+          }catch(err){alert('Errore: '+err.message);}
+        };
+        banner.style.display='block';
+      } else {
+        console.log('[AutoUpdate] Versione aggiornata (v'+CURRENT_VERSION+')');
+      }
+    }catch(err){console.warn('[AutoUpdate] Errore:',err);}
+  }
+
+  checkForUpdate();
+})();
+</script>
+</body>
+</html>

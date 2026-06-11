@@ -1,6 +1,6 @@
 {
-  "version": "2.3",
-  "filename": "TIA_Analisi_Variabili_v2.3.html",
-  "date": "2026-05-20",
-  "notes": "Aggiunto controllo automatico aggiornamento versione"
+  "version": "2.4",
+  "filename": "TIA_Analisi_Variabili_v2.4.html",
+  "date": "2026-06-11",
+  "notes": "Nuova modalità TIA: lettura diretta da un progetto TIA Portal aperto via bridge Openness locale (con popup di selezione progetto se più di uno è aperto)"
 }

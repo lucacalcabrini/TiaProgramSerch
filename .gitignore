@@ -7,3 +7,17 @@
 
 # Old versions (only latest version is tracked)
 TIA_Analisi_Variabili_v1*.html
+
+# ── App desktop C# (.NET) ──────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+*.user
+.vs/
+
+# Velopack / output release dell'app
+[Rr]eleases/
+publish/
+*.nupkg
+
+# NuGet
+packages/
