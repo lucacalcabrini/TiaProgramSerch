@@ -723,7 +723,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
   <div class="topbar-actions">
     <button class="btn-action green" id="btn-export" disabled onclick="exportExcel()">⬇ Excel</button>
     <button class="btn-action tia" id="btn-add-tia" onclick="openTiaProject()" title="Apri un progetto TIA Portal (.ap18 / .zap)">📂 Progetto</button>
-    <button class="btn-action orange" id="btn-export-xml" onclick="exportTiaXml()" title="Esporta tutto il progetto in XML: blocchi/variabili/UDT (SimaticML) + hardware (AutomationML)">💾 XML</button>
+    <button class="btn-action orange" id="btn-export-xml" onclick="exportTiaXml()" title="Esporta tutto il SW del progetto in XML: blocchi, tabelle variabili e UDT (SimaticML)">💾 XML</button>
   </div>
   <div class="topbar-stats">
     <div class="ts"><div class="ts-num g" id="st-vs">—</div><div class="ts-lbl">VS_Pos</div></div>
@@ -750,7 +750,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
           📂 Apri progetto (.ap18 / .zap)
         </button>
         <button class="drop-btn" style="border-color:#f5a623;color:#f5a623" onclick="exportTiaXml()">
-          💾 Esporta XML (SW + HW)
+          💾 Esporta XML
         </button>
         <button class="drop-btn" style="border-color:var(--acc3);color:var(--acc3)" onclick="document.getElementById('xlsxInput').click()">
           Carica Excel
@@ -1715,7 +1715,7 @@ async function openTiaProject() {
   ps.style.display = 'none';
 }
 
-// Export completo del progetto in XML: SW (SimaticML) + HW (AutomationML).
+// Export completo del SW del progetto in XML (SimaticML).
 // Non carica nulla nell'analisi: produce solo i file nella cartella scelta.
 async function exportTiaXml() {
   if (!TIA_APP) {
@@ -1734,7 +1734,7 @@ async function exportTiaXml() {
   document.getElementById('dropzone').style.display = 'none';
   const ps = document.getElementById('progress-section');
   ps.style.display = 'block';
-  document.getElementById('prog-file').textContent = sel.name + ' → XML (SW + HW)';
+  document.getElementById('prog-file').textContent = sel.name + ' → XML';
   setProgress(2, 'Scegli la cartella di destinazione...');
 
   let res;
@@ -1751,14 +1751,12 @@ async function exportTiaXml() {
   if (dzWasVisible) document.getElementById('dropzone').style.display = '';
   if (res && res.cancelled) return;   // annullato sulla scelta cartella
 
-  const hw = res.hardware ? 'sì (AutomationML)' : ('no — ' + (res.hardwareError || 'non disponibile'));
   alert('Export XML completato!\n\n'
       + 'Cartella: ' + res.outDir + '\n\n'
       + 'PLC: ' + res.plcs + '\n'
       + 'Blocchi: ' + res.blocks + (res.skipped ? ' (saltati: ' + res.skipped + ', es. know-how protected)' : '') + '\n'
       + 'Tabelle variabili: ' + res.tagTables + '\n'
-      + 'Tipi dati (UDT): ' + res.types + '\n'
-      + 'Hardware: ' + hw);
+      + 'Tipi dati (UDT): ' + res.types);
   try { await tiaAppCall('openFolder', { dir: res.outDir }, 8000); } catch (_) {}
 }
 

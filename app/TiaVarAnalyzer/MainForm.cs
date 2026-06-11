@@ -153,12 +153,12 @@ namespace TiaVarAnalyzer
                         }
                     case "exportXml":
                         {
-                            // Export completo SW (SimaticML) + HW (AutomationML) del progetto.
+                            // Export completo del SW del progetto in XML (SimaticML).
                             string path = (string)args["path"] ?? "";
                             string outDir;
                             using (var dlg = new FolderBrowserDialog
                             {
-                                Description = "Cartella di destinazione per l'export XML (SW + HW)",
+                                Description = "Cartella di destinazione per l'export XML",
                                 ShowNewFolderButton = true
                             })
                             {
