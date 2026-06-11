@@ -30,6 +30,7 @@ namespace TiaVarAnalyzer
             _client = new OpennessClient(mock);
 
             Text = "TIA Var Analyzer" + (mock ? "  (MOCK)" : "");
+            try { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location); } catch { }
             Width = 1280; Height = 820;
             StartPosition = FormStartPosition.CenterScreen;
             WindowState = FormWindowState.Maximized;

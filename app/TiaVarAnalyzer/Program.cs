@@ -8,7 +8,7 @@ namespace TiaVarAnalyzer
 {
     internal static class Program
     {
-        public const string AppVersion = "3.0.0";
+        public const string AppVersion = "3.0.1";
         const string RepoUrl = "https://github.com/lucacalcabrini/TiaProgramSerch";
 
         [STAThread]

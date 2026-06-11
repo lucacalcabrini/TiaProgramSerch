@@ -36,6 +36,7 @@ $RepoUrl = 'https://github.com/lucacalcabrini/TiaProgramSerch'
 $proj    = Join-Path $PSScriptRoot 'TiaVarAnalyzer\TiaVarAnalyzer.csproj'
 $pubDir  = Join-Path $PSScriptRoot 'publish'
 $relDir  = Join-Path $PSScriptRoot 'Releases'
+$icon    = Join-Path $PSScriptRoot 'TiaVarAnalyzer\icon.ico'
 
 # 1) versione
 if (-not $Version) {
@@ -64,6 +65,7 @@ vpk pack `
     --packDir     $pubDir `
     --mainExe     TiaVarAnalyzer.exe `
     --packTitle   "TIA Var Analyzer" `
+    --icon        $icon `
     --outputDir   $relDir
 
 # 5) upload opzionale su GitHub Releases (repo pubblica -> auto-update Velopack all'avvio)
