@@ -12,7 +12,7 @@ namespace TiaVarAnalyzer
 {
     internal static class Program
     {
-        public const string AppVersion = "3.1.0";
+        public const string AppVersion = "3.2.0";
         const string RepoUrl = "https://github.com/lucacalcabrini/TiaProgramSerch";
 
         [STAThread]
@@ -21,10 +21,17 @@ namespace TiaVarAnalyzer
             // Velopack deve girare per primissimo (gestisce install/update hooks).
             VelopackApp.Build().Run();
 
-            // Modalità batch senza UI: TiaVarAnalyzer.exe --export <progetto> [--out <file.json>]
+            // Modalità batch senza UI:
+            //   --export <progetto> [--out <file.json>]        analisi VS_Pos/APP
+            //   --exportxml <progetto> --outdir <cartella>     export completo XML (SW+HW)
             if (args.Contains("--export"))
             {
                 Environment.Exit(RunCliExport(args));
+                return;
+            }
+            if (args.Contains("--exportxml"))
+            {
+                Environment.Exit(RunCliExportXml(args));
                 return;
             }
 
@@ -70,6 +77,49 @@ namespace TiaVarAnalyzer
                 var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
                 File.WriteAllText(outJson, JsonConvert.SerializeObject(bundle, Formatting.Indented, settings));
                 Log("OK -> " + outJson);
+                return 0;
+            }
+            catch (ProtectedProjectException pex)
+            {
+                Log("ERRORE: " + pex.Message + " Usa --user <utente> --pass <password>.");
+                return 2;
+            }
+            catch (Exception ex)
+            {
+                Log("ERRORE: " + ex);
+                return 1;
+            }
+        }
+
+        // Export completo del progetto in XML (SW SimaticML + HW AutomationML) da riga di comando.
+        // Uso: --exportxml <progetto> --outdir <cartella> [--user <utente> --pass <password>]
+        // Log: <outdir>\export-xml.log. Exit code 0 = ok, 2 = servono credenziali.
+        static int RunCliExportXml(string[] args)
+        {
+            string ArgAfter(string name)
+            {
+                int k = Array.IndexOf(args, name);
+                return (k >= 0 && k + 1 < args.Length) ? args[k + 1] : null;
+            }
+
+            string path = ArgAfter("--exportxml") ?? "";
+            string outDir = ArgAfter("--outdir") ?? Path.GetDirectoryName(path);
+            string user = ArgAfter("--user");
+            string pass = ArgAfter("--pass");
+            string log = Path.Combine(outDir ?? ".", "export-xml.log");
+
+            void Log(string s)
+            {
+                try { File.AppendAllText(log, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + s + Environment.NewLine); }
+                catch { }
+            }
+
+            try
+            {
+                Log("exportxml: " + path + " -> " + outDir);
+                var client = new OpennessClient(mock: false);
+                var res = client.ExportProjectXml(path, outDir, (p, t) => Log(p + "% " + t), user, pass);
+                Log($"OK -> {res.OutDir} | plc={res.Plcs} blocchi={res.Blocks} tabelle={res.TagTables} udt={res.Types} saltati={res.Skipped} hw={res.Hardware} {res.HardwareError}");
                 return 0;
             }
             catch (ProtectedProjectException pex)

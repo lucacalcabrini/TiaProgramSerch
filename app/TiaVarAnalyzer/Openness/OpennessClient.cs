@@ -7,10 +7,13 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Xml;
 using Siemens.Engineering;
+using Siemens.Engineering.Cax;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Tags;
+using Siemens.Engineering.SW.Types;
 
 namespace TiaVarAnalyzer.Openness
 {
@@ -118,6 +121,151 @@ namespace TiaVarAnalyzer.Openness
             {
                 CloseAll(portal, project, retrieveDir);
             }
+        }
+
+        // ---- export completo del progetto in XML (SW + HW) --------------------
+        // SW: blocchi, tabelle variabili e tipi dati (UDT) in SimaticML, con la
+        //     stessa struttura di cartelle del progetto.
+        // HW: configurazione dispositivi/reti in AutomationML (export CAx).
+        // Scrive in <outDir>\<Progetto>_XML_<timestamp>\ e NON modifica il progetto.
+
+        public XmlExportResult ExportProjectXml(string path, string outDir, Action<int, string> progress = null,
+                                                string umacUser = null, string umacPassword = null)
+        {
+            if (Mock)
+                return new XmlExportResult { OutDir = Path.Combine(outDir ?? @"C:\Temp", "Mock_XML"), Project = "Mock", Plcs = 1, Blocks = 3, TagTables = 2, Types = 1, Skipped = 0, Hardware = true };
+            Initialize();
+
+            void Report(int p, string t) { try { progress?.Invoke(p, t); } catch { } }
+
+            if (string.IsNullOrWhiteSpace(outDir))
+                throw new Exception("Cartella di destinazione non indicata.");
+
+            Project project = null;
+            string retrieveDir = null;
+            TiaPortal portal = OpenPortalWithProject(path, Report, out project, out retrieveDir, umacUser, umacPassword);
+            try
+            {
+                var res = new XmlExportResult { Project = project.Name };
+                string root = Path.Combine(outDir, SafeName(project.Name) + "_XML_" + DateTime.Now.ToString("yyyyMMdd_HHmm"));
+                Directory.CreateDirectory(root);
+                res.OutDir = root;
+
+                Report(20, "Ricerca dei PLC nel progetto...");
+                var plcs = GetPlcSoftwares(project);
+                res.Plcs = plcs.Count;
+
+                // -- SW: per ogni PLC, blocchi + tabelle variabili + UDT --
+                int plcIdx = 0;
+                foreach (var plc in plcs)
+                {
+                    plcIdx++;
+                    string plcDir = Path.Combine(root, SafeName(plc.Name));
+
+                    var blocks = new List<Tuple<PlcBlock, string>>();
+                    CollectBlocksWithPath(plc.BlockGroup, "", blocks);
+                    for (int i = 0; i < blocks.Count; i++)
+                    {
+                        if (i % 5 == 0 || i == blocks.Count - 1)
+                            Report(25 + (int)(45.0 * (i + 1) / Math.Max(1, blocks.Count)),
+                                   $"PLC {plcIdx}/{plcs.Count} — blocchi {i + 1}/{blocks.Count}: {blocks[i].Item1.Name}");
+                        if (ExportItem(() => blocks[i].Item1.Export(NewXmlFile(plcDir, "Blocchi", blocks[i].Item2, blocks[i].Item1.Name), ExportOptions.WithDefaults)))
+                            res.Blocks++;
+                        else res.Skipped++;
+                    }
+
+                    Report(72, $"PLC {plcIdx}/{plcs.Count} — tabelle variabili...");
+                    var tables = new List<Tuple<PlcTagTable, string>>();
+                    CollectTagTablesWithPath(plc.TagTableGroup, "", tables);
+                    foreach (var t in tables)
+                    {
+                        if (ExportItem(() => t.Item1.Export(NewXmlFile(plcDir, "TabelleVariabili", t.Item2, t.Item1.Name), ExportOptions.WithDefaults)))
+                            res.TagTables++;
+                        else res.Skipped++;
+                    }
+
+                    Report(78, $"PLC {plcIdx}/{plcs.Count} — tipi dati (UDT)...");
+                    var types = new List<Tuple<PlcType, string>>();
+                    CollectTypesWithPath(plc.TypeGroup, "", types);
+                    foreach (var t in types)
+                    {
+                        if (ExportItem(() => t.Item1.Export(NewXmlFile(plcDir, "TipiDati", t.Item2, t.Item1.Name), ExportOptions.WithDefaults)))
+                            res.Types++;
+                        else res.Skipped++;
+                    }
+                }
+
+                // -- HW: configurazione completa in AutomationML (CAx) --
+                Report(85, "Export hardware (AutomationML)...");
+                try
+                {
+                    var cax = project.GetService<CaxProvider>();
+                    if (cax == null) throw new Exception("Servizio CAx non disponibile in questa versione di TIA.");
+                    string hwDir = Path.Combine(root, "Hardware");
+                    Directory.CreateDirectory(hwDir);
+                    string aml = Path.Combine(hwDir, SafeName(project.Name) + ".aml");
+                    string log = Path.Combine(hwDir, "CaxExport.log");
+                    res.Hardware = cax.Export(project, new FileInfo(aml), new FileInfo(log));
+                    if (!res.Hardware) res.HardwareError = "Export CAx terminato con avvisi: vedi " + log;
+                }
+                catch (Exception ex)
+                {
+                    res.Hardware = false;
+                    res.HardwareError = FirstLine(ex.Message);
+                }
+
+                Report(94, "Chiusura di TIA Portal...");
+                return res;
+            }
+            finally
+            {
+                CloseAll(portal, project, retrieveDir);
+            }
+        }
+
+        static bool ExportItem(Action export)
+        {
+            try { export(); return true; }
+            catch { return false; }   // tipico: blocco know-how protected o non compilato
+        }
+
+        // Crea (sovrascrivendo) il FileInfo di destinazione rispettando la gerarchia
+        // dei gruppi del progetto: <plcDir>\<categoria>\<gruppo\sottogruppo>\<nome>.xml
+        static FileInfo NewXmlFile(string plcDir, string category, string groupPath, string name)
+        {
+            string dir = Path.Combine(plcDir, category);
+            if (!string.IsNullOrEmpty(groupPath)) dir = Path.Combine(dir, groupPath);
+            Directory.CreateDirectory(dir);
+            string file = Path.Combine(dir, SafeName(name) + ".xml");
+            if (File.Exists(file)) File.Delete(file);   // Export rifiuta i file esistenti
+            return new FileInfo(file);
+        }
+
+        static string SafeName(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "_";
+            return string.Join("_", s.Split(Path.GetInvalidFileNameChars())).Trim();
+        }
+
+        void CollectBlocksWithPath(PlcBlockGroup group, string path, List<Tuple<PlcBlock, string>> acc)
+        {
+            foreach (PlcBlock b in group.Blocks) acc.Add(Tuple.Create(b, path));
+            foreach (PlcBlockUserGroup g in group.Groups)
+                CollectBlocksWithPath(g, Path.Combine(path, SafeName(g.Name)), acc);
+        }
+
+        void CollectTagTablesWithPath(PlcTagTableGroup group, string path, List<Tuple<PlcTagTable, string>> acc)
+        {
+            foreach (PlcTagTable t in group.TagTables) acc.Add(Tuple.Create(t, path));
+            foreach (PlcTagTableUserGroup g in group.Groups)
+                CollectTagTablesWithPath(g, Path.Combine(path, SafeName(g.Name)), acc);
+        }
+
+        void CollectTypesWithPath(PlcTypeGroup group, string path, List<Tuple<PlcType, string>> acc)
+        {
+            foreach (PlcType t in group.Types) acc.Add(Tuple.Create(t, path));
+            foreach (PlcTypeUserGroup g in group.Groups)
+                CollectTypesWithPath(g, Path.Combine(path, SafeName(g.Name)), acc);
         }
 
         // ---- XML grezzo di un blocco (debug / calibrazione parser) ------------
