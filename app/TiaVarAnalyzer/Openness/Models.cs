@@ -61,6 +61,20 @@ namespace TiaVarAnalyzer.Openness
         public int Linea { get; set; }
     }
 
+    // Esito dell'export completo del progetto in XML (SW SimaticML + HW AutomationML).
+    public class XmlExportResult
+    {
+        public string OutDir { get; set; }
+        public string Project { get; set; }
+        public int Plcs { get; set; }
+        public int Blocks { get; set; }
+        public int TagTables { get; set; }
+        public int Types { get; set; }
+        public int Skipped { get; set; }
+        public bool Hardware { get; set; }
+        public string HardwareError { get; set; }
+    }
+
     public class Bundle
     {
         public string Tool { get; set; } = "tia-app";

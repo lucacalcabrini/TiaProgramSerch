@@ -151,6 +151,52 @@ namespace TiaVarAnalyzer
                             }
                             break;
                         }
+                    case "exportXml":
+                        {
+                            // Export completo SW (SimaticML) + HW (AutomationML) del progetto.
+                            string path = (string)args["path"] ?? "";
+                            string outDir;
+                            using (var dlg = new FolderBrowserDialog
+                            {
+                                Description = "Cartella di destinazione per l'export XML (SW + HW)",
+                                ShowNewFolderButton = true
+                            })
+                            {
+                                if (dlg.ShowDialog(this) != DialogResult.OK)
+                                {
+                                    result = new { cancelled = true };
+                                    break;
+                                }
+                                outDir = dlg.SelectedPath;
+                            }
+
+                            string user = null, pass = null;
+                            while (true)
+                            {
+                                try
+                                {
+                                    result = await Task.Run(() => _client.ExportProjectXml(path, outDir, PostProgress, user, pass));
+                                    break;
+                                }
+                                catch (ProtectedProjectException pex)
+                                {
+                                    var cred = PromptUmacCredentials(Path.GetFileName(path), pex.Message);
+                                    if (cred == null)
+                                        throw new Exception("Progetto protetto: export annullato (credenziali non fornite).");
+                                    user = cred.Item1; pass = cred.Item2;
+                                }
+                            }
+                            break;
+                        }
+                    case "openFolder":
+                        {
+                            // Apre la cartella dell'export in Esplora risorse.
+                            string dir = (string)args["dir"] ?? "";
+                            if (Directory.Exists(dir))
+                                System.Diagnostics.Process.Start("explorer.exe", "\"" + dir + "\"");
+                            result = new { ok = Directory.Exists(dir) };
+                            break;
+                        }
                     case "raw":
                         {
                             string path = (string)args["path"] ?? "";

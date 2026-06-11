@@ -712,7 +712,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="logo">TIA<span> Var</span>Analyzer</div>
-  <div class="version-badge">v3.1</div>
+  <div class="version-badge">v3.2</div>
   <div class="global-search-wrap">
     <span class="global-search-icon">⌕</span>
     <input type="text" id="global-search" placeholder="Ricerca globale tutti i tab..." oninput="onGlobalSearch()">
@@ -723,6 +723,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
   <div class="topbar-actions">
     <button class="btn-action green" id="btn-export" disabled onclick="exportExcel()">⬇ Excel</button>
     <button class="btn-action tia" id="btn-add-tia" onclick="openTiaProject()" title="Apri un progetto TIA Portal (.ap18 / .zap)">📂 Progetto</button>
+    <button class="btn-action orange" id="btn-export-xml" onclick="exportTiaXml()" title="Esporta tutto il progetto in XML: blocchi/variabili/UDT (SimaticML) + hardware (AutomationML)">💾 XML</button>
   </div>
   <div class="topbar-stats">
     <div class="ts"><div class="ts-num g" id="st-vs">—</div><div class="ts-lbl">VS_Pos</div></div>
@@ -747,6 +748,9 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <button class="drop-btn tia" onclick="openTiaProject()">
           📂 Apri progetto (.ap18 / .zap)
+        </button>
+        <button class="drop-btn" style="border-color:#f5a623;color:#f5a623" onclick="exportTiaXml()">
+          💾 Esporta XML (SW + HW)
         </button>
         <button class="drop-btn" style="border-color:var(--acc3);color:var(--acc3)" onclick="document.getElementById('xlsxInput').click()">
           Carica Excel
@@ -1709,6 +1713,53 @@ async function openTiaProject() {
   setProgress(100, 'Completato!');
   await sleep(350);
   ps.style.display = 'none';
+}
+
+// Export completo del progetto in XML: SW (SimaticML) + HW (AutomationML).
+// Non carica nulla nell'analisi: produce solo i file nella cartella scelta.
+async function exportTiaXml() {
+  if (!TIA_APP) {
+    alert('L\'export XML è disponibile solo nell\'app desktop TIA Var Analyzer.');
+    return;
+  }
+
+  // 1) progetto da esportare
+  let sel;
+  try { sel = await tiaAppCall('pick', {}, 300000); }
+  catch (e) { alert('Selezione del file non riuscita: ' + e.message); return; }
+  if (!sel || sel.cancelled) return;
+
+  // 2) cartella di destinazione (dialog C#) + export headless
+  const dzWasVisible = document.getElementById('dropzone').style.display !== 'none';
+  document.getElementById('dropzone').style.display = 'none';
+  const ps = document.getElementById('progress-section');
+  ps.style.display = 'block';
+  document.getElementById('prog-file').textContent = sel.name + ' → XML (SW + HW)';
+  setProgress(2, 'Scegli la cartella di destinazione...');
+
+  let res;
+  try {
+    res = await tiaAppCall('exportXml', { path: sel.path }, 1800000);  // fino a 30 min
+  } catch (e) {
+    alert('Errore durante l\'export XML: ' + e.message);
+    ps.style.display = 'none';
+    if (dzWasVisible) document.getElementById('dropzone').style.display = '';
+    return;
+  }
+
+  ps.style.display = 'none';
+  if (dzWasVisible) document.getElementById('dropzone').style.display = '';
+  if (res && res.cancelled) return;   // annullato sulla scelta cartella
+
+  const hw = res.hardware ? 'sì (AutomationML)' : ('no — ' + (res.hardwareError || 'non disponibile'));
+  alert('Export XML completato!\n\n'
+      + 'Cartella: ' + res.outDir + '\n\n'
+      + 'PLC: ' + res.plcs + '\n'
+      + 'Blocchi: ' + res.blocks + (res.skipped ? ' (saltati: ' + res.skipped + ', es. know-how protected)' : '') + '\n'
+      + 'Tabelle variabili: ' + res.tagTables + '\n'
+      + 'Tipi dati (UDT): ' + res.types + '\n'
+      + 'Hardware: ' + hw);
+  try { await tiaAppCall('openFolder', { dir: res.outDir }, 8000); } catch (_) {}
 }
 
 // Carica un bundle JSON prodotto dal bridge come nuova sorgente "tia"

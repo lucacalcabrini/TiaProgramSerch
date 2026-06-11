@@ -12,7 +12,7 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>3.1.0</Version>
+    <Version>3.2.0</Version>
     <Product>TIA Var Analyzer</Product>
     <Company>lucacalcabrini</Company>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
