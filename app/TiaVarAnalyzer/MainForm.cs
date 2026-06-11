@@ -188,6 +188,30 @@ namespace TiaVarAnalyzer
                             }
                             break;
                         }
+                    case "pickXml":
+                        {
+                            // Selezione della cartella di XML SimaticML (es. l'output di un export).
+                            using (var dlg = new FolderBrowserDialog
+                            {
+                                Description = "Cartella con gli XML del progetto (SimaticML)",
+                                ShowNewFolderButton = false
+                            })
+                            {
+                                if (dlg.ShowDialog(this) == DialogResult.OK)
+                                    result = new { cancelled = false, path = dlg.SelectedPath, name = Path.GetFileName(dlg.SelectedPath.TrimEnd(Path.DirectorySeparatorChar)) };
+                                else
+                                    result = new { cancelled = true };
+                            }
+                            break;
+                        }
+                    case "loadXml":
+                        {
+                            // Analisi degli XML già esportati: non avvia TIA, è puro parsing.
+                            string path = (string)args["path"] ?? "";
+                            string name = (string)args["name"];
+                            result = await Task.Run(() => OpennessClient.ParseXmlPaths(new[] { path }, name, PostProgress));
+                            break;
+                        }
                     case "openFolder":
                         {
                             // Apre la cartella dell'export in Esplora risorse.

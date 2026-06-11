@@ -12,7 +12,7 @@ namespace TiaVarAnalyzer
 {
     internal static class Program
     {
-        public const string AppVersion = "3.2.1";
+        public const string AppVersion = "3.3.0";
         const string RepoUrl = "https://github.com/lucacalcabrini/TiaProgramSerch";
 
         [STAThread]
@@ -32,6 +32,11 @@ namespace TiaVarAnalyzer
             if (args.Contains("--exportxml"))
             {
                 Environment.Exit(RunCliExportXml(args));
+                return;
+            }
+            if (args.Contains("--loadxml"))
+            {
+                Environment.Exit(RunCliLoadXml(args));
                 return;
             }
 
@@ -126,6 +131,44 @@ namespace TiaVarAnalyzer
             {
                 Log("ERRORE: " + pex.Message + " Usa --user <utente> --pass <password>.");
                 return 2;
+            }
+            catch (Exception ex)
+            {
+                Log("ERRORE: " + ex);
+                return 1;
+            }
+        }
+
+        // Analizza una cartella di XML SimaticML già esportati e scrive il bundle JSON.
+        // NON avvia TIA Portal: è puro parsing, funziona su qualunque PC.
+        // Uso: --loadxml <cartella> [--out <file.json>]
+        static int RunCliLoadXml(string[] args)
+        {
+            string ArgAfter(string name)
+            {
+                int k = Array.IndexOf(args, name);
+                return (k >= 0 && k + 1 < args.Length) ? args[k + 1] : null;
+            }
+
+            string dir = ArgAfter("--loadxml") ?? "";
+            string outJson = ArgAfter("--out") ?? Path.Combine(dir, "analysis.json");
+            string log = outJson + ".log";
+
+            void Log(string s)
+            {
+                try { File.AppendAllText(log, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + s + Environment.NewLine); }
+                catch { }
+            }
+
+            try
+            {
+                Log("loadxml: " + dir);
+                var name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar));
+                var bundle = OpennessClient.ParseXmlPaths(new[] { dir }, name, (p, t) => Log(p + "% " + t));
+                var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+                File.WriteAllText(outJson, JsonConvert.SerializeObject(bundle, Formatting.Indented, settings));
+                Log($"OK -> {outJson} | file={bundle.Stats.Blocks} saltati={bundle.Stats.Skipped} vs={bundle.Stats.Vs} app={bundle.Stats.App}");
+                return 0;
             }
             catch (Exception ex)
             {

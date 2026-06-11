@@ -642,6 +642,7 @@ th .col-resize:hover, th .col-resize.dragging { background: var(--accent); opaci
 .src-pdf  { background: rgba(0,212,255,0.1);  color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
 .src-xlsx { background: rgba(57,255,143,0.1); color: var(--acc3);   border: 1px solid rgba(57,255,143,0.2); }
 .src-tia  { background: rgba(183,148,246,0.12); color:#c4a9f9; border:1px solid rgba(183,148,246,0.28); }
+.src-xml  { background: rgba(245,166,35,0.12); color:#f5a623; border:1px solid rgba(245,166,35,0.3); }
 
 .drop-btn.tia{ border-color:#b794f6; color:#c4a9f9; }
 .btn-action.tia{ border-color:rgba(183,148,246,0.4); color:#c4a9f9; }
@@ -712,7 +713,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="logo">TIA<span> Var</span>Analyzer</div>
-  <div class="version-badge">v3.2</div>
+  <div class="version-badge">v3.3</div>
   <div class="global-search-wrap">
     <span class="global-search-icon">⌕</span>
     <input type="text" id="global-search" placeholder="Ricerca globale tutti i tab..." oninput="onGlobalSearch()">
@@ -724,6 +725,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
     <button class="btn-action green" id="btn-export" disabled onclick="exportExcel()">⬇ Excel</button>
     <button class="btn-action tia" id="btn-add-tia" onclick="openTiaProject()" title="Apri un progetto TIA Portal (.ap18 / .zap)">📂 Progetto</button>
     <button class="btn-action orange" id="btn-export-xml" onclick="exportTiaXml()" title="Esporta tutto il SW del progetto in XML: blocchi, tabelle variabili e UDT (SimaticML)">💾 XML</button>
+    <button class="btn-action" id="btn-load-xml" onclick="loadFromXml()" style="border-color:rgba(245,166,35,0.4);color:#f5a623" title="Analizza una cartella di XML SimaticML già esportati (non serve TIA)">📥 Carica XML</button>
   </div>
   <div class="topbar-stats">
     <div class="ts"><div class="ts-num g" id="st-vs">—</div><div class="ts-lbl">VS_Pos</div></div>
@@ -743,6 +745,7 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
         <strong style="color:#c4a9f9">.ap18</strong> — progetto TIA Portal V18 &nbsp;·&nbsp;
         <strong style="color:#c4a9f9">.zap18 / .zap</strong> — archivio di progetto (estratto in automatico)<br>
         L'app apre il progetto in background con TIA Openness: non serve avere TIA Portal aperto.<br>
+        Hai già gli <strong style="color:#f5a623">XML</strong> esportati? Caricali direttamente: l'analisi è istantanea e non serve TIA.<br>
         In alternativa ricarica un <strong style="color:var(--acc3)">XLSX</strong> esportato in precedenza, per il confronto.
       </div>
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
@@ -751,6 +754,9 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
         </button>
         <button class="drop-btn" style="border-color:#f5a623;color:#f5a623" onclick="exportTiaXml()">
           💾 Esporta XML
+        </button>
+        <button class="drop-btn" style="border-color:#f5a623;color:#f5a623" onclick="loadFromXml()">
+          📥 Carica XML
         </button>
         <button class="drop-btn" style="border-color:var(--acc3);color:var(--acc3)" onclick="document.getElementById('xlsxInput').click()">
           Carica Excel
@@ -1582,7 +1588,7 @@ function updateSourcesBar() {
   bar.style.display = 'flex';
   bar.innerHTML = SOURCES.map((s,i) => `
     <div class="source-chip">
-      <span class="src-badge ${s.type==='xlsx'?'src-xlsx':s.type==='tia'?'src-tia':'src-pdf'}">${s.type.toUpperCase()}</span>
+      <span class="src-badge ${s.type==='xlsx'?'src-xlsx':s.type==='tia'?'src-tia':s.type==='xml'?'src-xml':'src-pdf'}">${s.type.toUpperCase()}</span>
       <span class="source-chip-name">${escHtml(s.name)}</span>
       <span class="source-chip-cnt">${s.vsCount} VS · ${s.appCount} APP</span>
       <button class="source-chip-x" onclick="removeSource(${i})" title="Rimuovi">✕</button>
@@ -1760,9 +1766,51 @@ async function exportTiaXml() {
   try { await tiaAppCall('openFolder', { dir: res.outDir }, 8000); } catch (_) {}
 }
 
-// Carica un bundle JSON prodotto dal bridge come nuova sorgente "tia"
-function loadBundle(b) {
-  const srcName = (b.project && b.project.name) ? b.project.name : 'Progetto TIA';
+// Analizza una cartella di XML SimaticML già esportati. Non avvia TIA: puro parsing,
+// quindi è istantaneo e funziona anche su PC senza TIA Portal installato.
+async function loadFromXml() {
+  if (!TIA_APP) {
+    alert('Il caricamento degli XML è disponibile solo nell\'app desktop TIA Var Analyzer.');
+    return;
+  }
+
+  // 1) cartella con gli XML (dialog C#)
+  let sel;
+  try { sel = await tiaAppCall('pickXml', {}, 300000); }
+  catch (e) { alert('Selezione della cartella non riuscita: ' + e.message); return; }
+  if (!sel || sel.cancelled) return;
+
+  // 2) analisi (rapida, nessun avvio di TIA)
+  const dzWasVisible = document.getElementById('dropzone').style.display !== 'none';
+  document.getElementById('dropzone').style.display = 'none';
+  const ps = document.getElementById('progress-section');
+  ps.style.display = 'block';
+  document.getElementById('info-bar').style.display = 'none';
+  document.getElementById('analysis').style.display = 'none';
+  document.getElementById('prog-file').textContent = sel.name;
+  setProgress(5, 'Analisi degli XML...');
+
+  let bundle;
+  try {
+    bundle = await tiaAppCall('loadXml', { path: sel.path, name: sel.name }, 600000);
+  } catch (e) {
+    alert('Errore durante l\'analisi degli XML: ' + e.message);
+    ps.style.display = 'none';
+    if (dzWasVisible && SOURCES.length === 0) document.getElementById('dropzone').style.display = '';
+    return;
+  }
+
+  setProgress(96, 'Caricamento risultati...');
+  loadBundle(bundle, 'xml');
+  setProgress(100, 'Completato!');
+  await sleep(300);
+  ps.style.display = 'none';
+}
+
+// Carica un bundle JSON (da progetto TIA o da XML) come nuova sorgente.
+function loadBundle(b, sourceType = 'tia') {
+  const fallback = sourceType === 'xml' ? 'XML esportato' : 'Progetto TIA';
+  const srcName = (b.project && b.project.name) ? b.project.name : fallback;
   const vsData = (b.vs || []).map(r => ({
     sorgente: srcName, asse: r.asse || '', indice: parseInt(r.indice) || 0,
     blocco: r.blocco || '', segmento: r.segmento || '', operazione: r.operazione || '',
@@ -1776,14 +1824,15 @@ function loadBundle(b) {
 
   VS_DATA  = [...VS_DATA,  ...vsData];
   APP_DATA = [...APP_DATA, ...appData];
-  SOURCES.push({ name: srcName, type: 'tia', vsCount: vsData.length, appCount: appData.length });
+  SOURCES.push({ name: srcName, type: sourceType, vsCount: vsData.length, appCount: appData.length });
 
   // Da un progetto vogliamo vedere TUTTE le occorrenze, non solo le assegnazioni
   vsAssignOnly = false; appAssignOnly = false;
   document.getElementById('vs-assign-toggle').classList.remove('on');
   document.getElementById('app-assign-toggle').classList.remove('on');
 
-  const tiaVer = (b.project && b.project.tiaVersion) ? ('TIA ' + b.project.tiaVersion) : '—';
+  const tiaVer = (b.project && b.project.tiaVersion) ? ('TIA ' + b.project.tiaVersion)
+               : (sourceType === 'xml' ? 'da XML' : '—');
   const blocks = (b.stats && b.stats.blocks) || '—';
   finalizeLoad(srcName, srcName, null, blocks, tiaVer);
 }
@@ -1828,7 +1877,7 @@ function exportExcel() {
 // ─── DIFF / CONFRONTO ────────────────────────────────────────────────────────
 function computeDiff() {
   const xlsxSrcs = SOURCES.filter(s=>s.type==='xlsx').map(s=>s.name);
-  const pdfSrcs  = SOURCES.filter(s=>s.type==='pdf'||s.type==='tia').map(s=>s.name);
+  const pdfSrcs  = SOURCES.filter(s=>s.type==='pdf'||s.type==='tia'||s.type==='xml').map(s=>s.name);
   if (!xlsxSrcs.length || !pdfSrcs.length) return;
 
   const vsXlsx = VS_DATA.filter(r=>xlsxSrcs.includes(r.sorgente));
@@ -1939,7 +1988,7 @@ function finalizeLoad(projName, fileName, numPages, blocks, tiaVer) {
   document.getElementById('analysis').style.display = 'block';
   // Compute diff if we have both xlsx and pdf
   const hasXlsx = SOURCES.some(s=>s.type==='xlsx');
-  const hasPdf  = SOURCES.some(s=>s.type==='pdf'||s.type==='tia');
+  const hasPdf  = SOURCES.some(s=>s.type==='pdf'||s.type==='tia'||s.type==='xml');
   if (hasXlsx && hasPdf) computeDiff();
   else { document.getElementById('tab-diff').style.display='none'; }
   // Update info bar if first load
@@ -2022,7 +2071,7 @@ function escHtml(s) {
 function srcBadgeClass(name) {
   const s = SOURCES.find(x => x.name === name);
   const t = s ? s.type : (name && name.endsWith('.xlsx') ? 'xlsx' : 'pdf');
-  return t === 'xlsx' ? 'src-xlsx' : t === 'tia' ? 'src-tia' : 'src-pdf';
+  return t === 'xlsx' ? 'src-xlsx' : t === 'tia' ? 'src-tia' : t === 'xml' ? 'src-xml' : 'src-pdf';
 }
 
 function escAttr(s) {

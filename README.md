@@ -9,6 +9,7 @@ Due modi per fornire i dati, **stessa interfaccia**:
 | Sorgente | Come |
 |----------|------|
 | 📂 **Progetto TIA** | Apri un **`.ap18`** o un archivio **`.zap18`/`.zap`**: l'app avvia TIA Portal **headless** in background (Openness), esporta i blocchi e li analizza. Non serve avere TIA aperto. |
+| 📥 **XML SimaticML** | Carica una cartella di **XML** già esportati (vedi pulsante 💾 XML): l'analisi è **istantanea e non richiede TIA Portal** — è puro parsing, funziona su qualunque PC. |
 | 📊 **Excel** | Re-import di un export precedente di questo tool (per il confronto/diff) |
 
 In più, il pulsante **💾 XML** esporta **tutto il SW del progetto in XML**: blocchi, tabelle
@@ -52,6 +53,9 @@ TiaVarAnalyzer.exe --export "C:\percorso\Progetto.zap18" --out "C:\temp\bundle.j
 
 # export completo del SW del progetto in XML (SimaticML)
 TiaVarAnalyzer.exe --exportxml "C:\percorso\Progetto.zap18" --outdir "C:\temp\export"
+
+# analisi di una cartella di XML già esportati (NON avvia TIA, istantaneo)
+TiaVarAnalyzer.exe --loadxml "C:\temp\export\Progetto_XML_..." --out "C:\temp\bundle.json"
 ```
 Progetti protetti (UMAC): aggiungere `--user <utente> --pass <password>` (exit code 2 = credenziali
 mancanti/errate). Ogni comando scrive un log testuale accanto all'output. Exit code 0 = ok.
