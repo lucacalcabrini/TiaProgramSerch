@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TIA Var Analyzer · v2.4</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap');
@@ -644,20 +643,6 @@ th .col-resize:hover, th .col-resize.dragging { background: var(--accent); opaci
 .src-xlsx { background: rgba(57,255,143,0.1); color: var(--acc3);   border: 1px solid rgba(57,255,143,0.2); }
 .src-tia  { background: rgba(183,148,246,0.12); color:#c4a9f9; border:1px solid rgba(183,148,246,0.28); }
 
-/* ===== TIA PROJECT SELECTION MODAL ===== */
-#tia-modal{ display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.62); align-items:center; justify-content:center; }
-#tia-modal.open{ display:flex; }
-.tia-modal-box{ background:var(--bg3); border:1px solid rgba(255,255,255,0.1); border-radius:14px; width:min(580px,92vw); max-height:82vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,0.55); }
-.tia-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.08); }
-.tia-modal-head h3{ margin:0; font-size:15px; color:var(--text); }
-.tia-modal-x{ background:none; border:none; color:var(--text2); font-size:22px; line-height:1; cursor:pointer; }
-.tia-modal-x:hover{ color:#fff; }
-.tia-modal-sub{ padding:12px 20px 0; font-size:12px; color:var(--text2); }
-#tia-proj-list{ padding:12px 16px 18px; display:flex; flex-direction:column; gap:8px; }
-.tia-proj-item{ padding:12px 14px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; cursor:pointer; transition:border-color .15s, background .15s; }
-.tia-proj-item:hover{ border-color:#b794f6; background:rgba(183,148,246,0.08); }
-.tia-proj-name{ font-weight:600; color:var(--text); font-size:14px; }
-.tia-proj-path{ font-size:11px; color:var(--text3); margin-top:3px; word-break:break-all; }
 .drop-btn.tia{ border-color:#b794f6; color:#c4a9f9; }
 .btn-action.tia{ border-color:rgba(183,148,246,0.4); color:#c4a9f9; }
 
@@ -727,19 +712,17 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="logo">TIA<span> Var</span>Analyzer</div>
-  <div class="version-badge">v2.4</div>
+  <div class="version-badge">v3.1</div>
   <div class="global-search-wrap">
     <span class="global-search-icon">⌕</span>
     <input type="text" id="global-search" placeholder="Ricerca globale tutti i tab..." oninput="onGlobalSearch()">
   </div>
   <div class="topbar-project" id="topbar-info">
-    Nessun file caricato — trascina un PDF o un Excel esportato
+    Nessun progetto caricato — apri un .ap18 o un archivio .zap
   </div>
   <div class="topbar-actions">
     <button class="btn-action green" id="btn-export" disabled onclick="exportExcel()">⬇ Excel</button>
-    <button class="btn-action orange" id="btn-add-pdf" disabled onclick="document.getElementById('addPdfInput').click()">＋ PDF</button>
-    <button class="btn-action tia" id="btn-add-tia" onclick="loadFromTia()" title="Leggi da un progetto TIA Portal aperto">📡 TIA</button>
-    <input type="file" id="addPdfInput" accept=".pdf" style="display:none" onchange="handleAddPDF(event)">
+    <button class="btn-action tia" id="btn-add-tia" onclick="openTiaProject()" title="Apri un progetto TIA Portal (.ap18 / .zap)">📂 Progetto</button>
   </div>
   <div class="topbar-stats">
     <div class="ts"><div class="ts-num g" id="st-vs">—</div><div class="ts-lbl">VS_Pos</div></div>
@@ -751,29 +734,26 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
 <div class="container">
 
   <!-- DROP ZONE -->
-  <div id="dropzone" onclick="if(event.target===this||event.target.id==='dropzone-inner'||event.target.classList.contains('drop-icon')||event.target.classList.contains('drop-title')||event.target.classList.contains('drop-sub')) document.getElementById('fileInput').click()">
+  <div id="dropzone" onclick="if(event.target===this||event.target.id==='dropzone-inner'||event.target.classList.contains('drop-icon')||event.target.classList.contains('drop-title')||event.target.classList.contains('drop-sub')) openTiaProject()">
     <div id="dropzone-inner">
-      <div class="drop-icon">📄</div>
-      <div class="drop-title">Carica PDF o Excel TIA Var Analyzer</div>
-      <div class="drop-sub">Trascina qui il file oppure clicca per selezionarlo<br>
-        <strong style="color:var(--accent)">PDF</strong> — stampa TIA Portal (analisi completa) &nbsp;·&nbsp;
-        <strong style="color:var(--acc3)">XLSX</strong> — export precedente (caricamento istantaneo) &nbsp;·&nbsp;
-        <strong style="color:#c4a9f9">TIA</strong> — leggi direttamente da un progetto aperto (bridge Openness)
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Apri un progetto TIA Portal</div>
+      <div class="drop-sub">
+        <strong style="color:#c4a9f9">.ap18</strong> — progetto TIA Portal V18 &nbsp;·&nbsp;
+        <strong style="color:#c4a9f9">.zap18 / .zap</strong> — archivio di progetto (estratto in automatico)<br>
+        L'app apre il progetto in background con TIA Openness: non serve avere TIA Portal aperto.<br>
+        In alternativa ricarica un <strong style="color:var(--acc3)">XLSX</strong> esportato in precedenza, per il confronto.
       </div>
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-        <button class="drop-btn" onclick="document.getElementById('fileInput').click()">
-          Seleziona PDF
+        <button class="drop-btn tia" onclick="openTiaProject()">
+          📂 Apri progetto (.ap18 / .zap)
         </button>
         <button class="drop-btn" style="border-color:var(--acc3);color:var(--acc3)" onclick="document.getElementById('xlsxInput').click()">
           Carica Excel
         </button>
-        <button class="drop-btn tia" onclick="loadFromTia()">
-          📡 Leggi da progetto TIA
-        </button>
       </div>
     </div>
   </div>
-  <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleFile(event)">
   <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none" onchange="handleXlsx(event)">
 
   <!-- PROGRESS -->
@@ -1052,18 +1032,6 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
 
 </div><!-- /container -->
 
-<!-- ===== TIA PROJECT SELECTION MODAL ===== -->
-<div id="tia-modal" onclick="if(event.target===this) closeTiaModal()">
-  <div class="tia-modal-box">
-    <div class="tia-modal-head">
-      <h3>📡 Seleziona il progetto TIA Portal</h3>
-      <button class="tia-modal-x" onclick="closeTiaModal()">&times;</button>
-    </div>
-    <div class="tia-modal-sub">Sono stati rilevati più progetti aperti. Scegli quale analizzare:</div>
-    <div id="tia-proj-list"></div>
-  </div>
-</div>
-
 <!-- ===== PDF MODAL ===== -->
 <div id="pdf-modal" onclick="if(event.target===this) closeModal()">
   <div class="modal-box">
@@ -1087,10 +1055,6 @@ tr.diff-changed td { background: rgba(240,201,106,0.05); }
 </div>
 
 <script>
-// ─── PDF.js setup ───────────────────────────────────────────────────────────
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
 // ─── State ───────────────────────────────────────────────────────────────────
 let VS_DATA = [], APP_DATA = [];
 let pdfDoc = null;
@@ -1161,19 +1125,14 @@ dz.addEventListener('drop', e => {
   e.preventDefault(); dz.classList.remove('drag-over');
   const f = e.dataTransfer.files[0];
   if (!f) return;
-  if (f.type === 'application/pdf' || f.name.endsWith('.pdf')) processPDF(f);
-  else if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
+  if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
     // simulate handleXlsx
     const fakeEvt = { target: { files: [f], value: '' } };
     handleXlsx(fakeEvt);
-  } else alert('Trascina un file PDF o un Excel esportato da TIA Var Analyzer.');
+  } else if (/\.(ap\d+(_\d+)?|zap\d*)$/i.test(f.name)) {
+    alert('Per i progetti TIA usa il pulsante "Apri progetto": serve il percorso completo del file, che il drag & drop non fornisce.');
+  } else alert('Trascina un Excel esportato da TIA Var Analyzer, oppure usa "Apri progetto" per .ap18/.zap.');
 });
-
-function handleFile(e) {
-  const f = e.target.files[0];
-  if (f) processPDF(f);
-  e.target.value = '';
-}
 
 // ─── PDF PROCESSING ──────────────────────────────────────────────────────────
 async function processPDF(file, appendMode = false) {
@@ -1687,16 +1646,19 @@ async function handleXlsx(e) {
   finalizeLoad();
 }
 
-// ─── MODALITÀ TIA (app WebView2 in-process • oppure bridge HTTP nel browser) ──
+// ─── MODALITÀ TIA (app desktop: apre .ap18/.zap headless via Openness) ───────
 const TIA_APP = !!(window.chrome && window.chrome.webview && window.chrome.webview.postMessage);
-const TIA_BRIDGE = localStorage.getItem('tiaBridgeUrl') || 'http://127.0.0.1:8731';
 
-// -- canale messaggi quando siamo dentro l'app desktop --
+// -- canale messaggi con il C# dell'app desktop --
 const _tiaPending = {}; let _tiaMsgId = 0;
 if (TIA_APP) {
   window.chrome.webview.addEventListener('message', ev => {
     let m = ev.data;
     if (typeof m === 'string') { try { m = JSON.parse(m); } catch (_) { return; } }
+    if (m && m.event === 'progress') {           // avanzamento dell'export dal C#
+      setProgress(Math.max(2, Math.min(94, m.percent || 0)), m.text || '');
+      return;
+    }
     const p = _tiaPending[m.id]; if (!p) return;
     delete _tiaPending[m.id];
     if (m.ok) p.resolve(m.result); else p.reject(new Error(m.error || 'errore'));
@@ -1711,106 +1673,38 @@ function tiaAppCall(action, args, timeout = 600000) {
   });
 }
 
-async function bridgeFetch(path, timeout = 8000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeout);
-  try { return await fetch(TIA_BRIDGE + path, { signal: ctrl.signal, cache: 'no-store' }); }
-  finally { clearTimeout(t); }
-}
-
-// API unificata: stessa interfaccia per app desktop e per browser+bridge
-const tiaApi = TIA_APP ? {
-  ping:     () => tiaAppCall('ping', {}, 8000),
-  projects: () => tiaAppCall('projects', {}, 20000),
-  export:   (pid) => tiaAppCall('export', { pid }, 600000)
-} : {
-  ping:     async () => { const r = await bridgeFetch('/ping', 3000); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); },
-  projects: async () => { const r = await bridgeFetch('/projects', 10000); const d = await r.json(); if (!d.ok) throw new Error(d.error || 'errore'); return d; },
-  export:   async (pid) => {
-    const r = await bridgeFetch('/export?pid=' + encodeURIComponent(pid), 600000);
-    if (!r.ok) { let m = 'HTTP ' + r.status; try { const e = await r.json(); if (e.error) m = e.error; } catch (_) {} throw new Error(m); }
-    return r.json();
-  }
-};
-
-async function loadFromTia() {
-  // 1) sorgente TIA raggiungibile?
-  try { await tiaApi.ping(); }
-  catch (e) {
-    alert(TIA_APP
-      ? ('Accesso a TIA Openness non riuscito.\nDettaglio: ' + e.message)
-      : ('Bridge TIA non raggiungibile su ' + TIA_BRIDGE + '.\n\nAvvia "tia-bridge.ps1" (cartella browser-bridge) e riprova.\n\nDettaglio: ' + e.message));
+async function openTiaProject() {
+  if (!TIA_APP) {
+    alert('L\'apertura dei progetti .ap18/.zap è disponibile solo nell\'app desktop TIA Var Analyzer.');
     return;
   }
 
-  // 2) progetti aperti
-  let d;
-  try { d = await tiaApi.projects(); }
-  catch (e) { alert('Errore nella lettura dei progetti aperti: ' + e.message); return; }
+  // 1) dialog nativo di selezione file (gestito dal C#: serve il percorso reale)
+  let sel;
+  try { sel = await tiaAppCall('pick', {}, 300000); }
+  catch (e) { alert('Selezione del file non riuscita: ' + e.message); return; }
+  if (!sel || sel.cancelled) return;
 
-  const valid = (d.projects || []).filter(p => p.path); // scarta istanze TIA senza progetto
-  if (valid.length === 0) {
-    alert('Nessun progetto TIA Portal aperto.\nApri un progetto in TIA e riprova.');
-    return;
-  }
-
-  // 3) uno solo → diretto; più di uno → popup di selezione
-  let chosen;
-  if (valid.length === 1) chosen = valid[0];
-  else { chosen = await tiaSelectProject(valid); if (!chosen) return; }
-
-  await tiaExport(chosen);
-}
-
-function tiaSelectProject(projects) {
-  return new Promise(resolve => {
-    const modal = document.getElementById('tia-modal');
-    const list  = document.getElementById('tia-proj-list');
-    list.innerHTML = '';
-    let done = false;
-    const finish = (val) => { if (done) return; done = true; modal.classList.remove('open'); resolve(val); };
-
-    projects.forEach(p => {
-      const div = document.createElement('div');
-      div.className = 'tia-proj-item';
-      div.innerHTML =
-        `<div class="tia-proj-name">${escHtml(p.name)}</div>
-         <div class="tia-proj-path">${escHtml(p.path || '')} · pid ${escHtml(String(p.pid))} · TIA ${escHtml(p.tiaVersion || '')}</div>`;
-      div.onclick = () => finish(p);
-      list.appendChild(div);
-    });
-    window._tiaModalCancel = () => finish(null);
-    modal.classList.add('open');
-  });
-}
-
-function closeTiaModal() {
-  document.getElementById('tia-modal').classList.remove('open');
-  if (window._tiaModalCancel) window._tiaModalCancel();
-}
-
-async function tiaExport(proj) {
+  // 2) export: TIA Portal parte headless in background (può richiedere qualche minuto)
   document.getElementById('dropzone').style.display = 'none';
   const ps = document.getElementById('progress-section');
   ps.style.display = 'block';
   document.getElementById('info-bar').style.display = 'none';
   document.getElementById('analysis').style.display = 'none';
-  document.getElementById('prog-file').textContent = proj.name;
-  setProgress(10, TIA_APP
-    ? 'Lettura dal progetto TIA — conferma il popup di sicurezza in TIA...'
-    : 'Connessione a TIA Portal — conferma il popup di sicurezza in TIA...');
+  document.getElementById('prog-file').textContent = sel.name;
+  setProgress(2, 'Avvio di TIA Portal in background...');
 
   let bundle;
   try {
-    bundle = await tiaApi.export(proj.pid);   // app: in-process • browser: HTTP bridge
+    bundle = await tiaAppCall('export', { path: sel.path }, 1800000);  // fino a 30 min
   } catch (e) {
-    alert('Errore durante l\'export dal progetto: ' + e.message);
+    alert('Errore durante l\'analisi del progetto: ' + e.message);
     ps.style.display = 'none';
     if (SOURCES.length === 0) document.getElementById('dropzone').style.display = '';
     return;
   }
 
-  setProgress(90, 'Analisi variabili...');
+  setProgress(96, 'Analisi variabili...');
   loadBundle(bundle);
   setProgress(100, 'Completato!');
   await sleep(350);
@@ -1992,7 +1886,6 @@ function finalizeLoad(projName, fileName, numPages, blocks, tiaVer) {
   updateSourcesBar();
   initResizeAfterRender();
   document.getElementById('btn-export').disabled = false;
-  document.getElementById('btn-add-pdf').disabled = false;
   document.getElementById('info-bar').style.display = 'flex';
   document.getElementById('analysis').style.display = 'block';
   // Compute diff if we have both xlsx and pdf
@@ -2029,9 +1922,8 @@ function resetAll() {
   document.getElementById('analysis').style.display = 'none';
   document.getElementById('tab-diff').style.display = 'none';
   document.getElementById('btn-export').disabled = true;
-  document.getElementById('btn-add-pdf').disabled = true;
   document.getElementById('global-search').value = '';
-  document.getElementById('topbar-info').textContent = 'Nessun file caricato — trascina un PDF o un Excel esportato';
+  document.getElementById('topbar-info').textContent = 'Nessun progetto caricato — apri un .ap18 o un archivio .zap';
   ['st-vs','st-app','st-pag'].forEach(id => document.getElementById(id).textContent='—');
   ['vs-asse','vs-idx','vs-blocco','vs-sorgente','app-num','app-blocco','app-sorgente'].forEach(id => {
     const el = document.getElementById(id);
