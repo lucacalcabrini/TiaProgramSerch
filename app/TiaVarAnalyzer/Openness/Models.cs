@@ -1,7 +1,15 @@
+using System;
 using System.Collections.Generic;
 
 namespace TiaVarAnalyzer.Openness
 {
+    // Il progetto è protetto (UMAC): servono nome utente e password di progetto.
+    // Il chiamante può chiederli all'utente e ritentare l'export con le credenziali.
+    public class ProtectedProjectException : Exception
+    {
+        public ProtectedProjectException(string message) : base(message) { }
+    }
+
     // Tutti i nomi vengono serializzati in camelCase (vedi MainForm.JsonSettings),
     // quindi le chiavi JSON coincidono con quelle attese dalla UI:
     // pid, name, path, tiaVersion, asse, indice, blocco, segmento, operazione,

@@ -114,20 +114,48 @@ namespace TiaVarAnalyzer
                     case "ping":
                         result = new { ok = true, tool = "tia-app", version = Program.AppVersion, mock = _mock, tiaVersion = _client.TiaVersion };
                         break;
-                    case "projects":
-                        result = new { projects = await Task.Run(() => _client.GetProjects()) };
+                    case "pick":
+                        // Dialog nativo: serve il percorso reale del file, che il JS non può ottenere.
+                        using (var dlg = new OpenFileDialog
+                        {
+                            Title = "Apri progetto TIA Portal",
+                            Filter = "Progetti TIA Portal (*.ap18;*.zap18;*.zap*)|*.ap18;*.zap18;*.zap*|Tutti i file (*.*)|*.*",
+                            CheckFileExists = true
+                        })
+                        {
+                            if (dlg.ShowDialog(this) == DialogResult.OK)
+                                result = new { cancelled = false, path = dlg.FileName, name = Path.GetFileName(dlg.FileName) };
+                            else
+                                result = new { cancelled = true };
+                        }
                         break;
                     case "export":
                         {
-                            int pid = args.Value<int?>("pid") ?? 0;
-                            result = await Task.Run(() => _client.ExportBundle(pid));
+                            string path = (string)args["path"] ?? "";
+                            string user = null, pass = null;
+                            while (true)
+                            {
+                                try
+                                {
+                                    result = await Task.Run(() => _client.ExportFromFile(path, PostProgress, user, pass));
+                                    break;
+                                }
+                                catch (ProtectedProjectException pex)
+                                {
+                                    // Progetto protetto (UMAC): chiedi le credenziali e ritenta.
+                                    var cred = PromptUmacCredentials(Path.GetFileName(path), pex.Message);
+                                    if (cred == null)
+                                        throw new Exception("Progetto protetto: analisi annullata (credenziali non fornite).");
+                                    user = cred.Item1; pass = cred.Item2;
+                                }
+                            }
                             break;
                         }
                     case "raw":
                         {
-                            int pid = args.Value<int?>("pid") ?? 0;
+                            string path = (string)args["path"] ?? "";
                             string block = (string)args["block"] ?? "";
-                            result = new { xml = await Task.Run(() => _client.GetRawXml(pid, block)) };
+                            result = new { xml = await Task.Run(() => _client.GetRawXml(path, block)) };
                             break;
                         }
                     default:
@@ -142,6 +170,47 @@ namespace TiaVarAnalyzer
 
             var resp = JsonConvert.SerializeObject(new { id, ok, result, error }, JsonSettings);
             try { _web.CoreWebView2.PostWebMessageAsJson(resp); } catch { }
+        }
+
+        // Dialog credenziali per progetti protetti (UMAC). Ritorna (utente, password) o null.
+        Tuple<string, string> PromptUmacCredentials(string projectName, string reason)
+        {
+            using (var f = new Form
+            {
+                Text = "Progetto protetto — " + projectName,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MinimizeBox = false, MaximizeBox = false,
+                ClientSize = new System.Drawing.Size(420, 168)
+            })
+            {
+                var lbl = new Label { Text = reason + "\nInserisci le credenziali del progetto:", Left = 14, Top = 12, Width = 392, Height = 34 };
+                var lu  = new Label { Text = "Utente",   Left = 14, Top = 56, Width = 70 };
+                var tu  = new TextBox { Left = 90, Top = 52, Width = 316 };
+                var lp  = new Label { Text = "Password", Left = 14, Top = 88, Width = 70 };
+                var tp  = new TextBox { Left = 90, Top = 84, Width = 316, UseSystemPasswordChar = true };
+                var ok  = new Button { Text = "OK",      Left = 240, Top = 124, Width = 80, DialogResult = DialogResult.OK };
+                var no  = new Button { Text = "Annulla", Left = 326, Top = 124, Width = 80, DialogResult = DialogResult.Cancel };
+                f.Controls.AddRange(new Control[] { lbl, lu, tu, lp, tp, ok, no });
+                f.AcceptButton = ok; f.CancelButton = no;
+                if (f.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(tu.Text))
+                    return null;
+                return Tuple.Create(tu.Text.Trim(), tp.Text);
+            }
+        }
+
+        // Avanzamento export → UI (chiamato da thread di lavoro: marshal sul thread UI).
+        void PostProgress(int percent, string text)
+        {
+            string json = JsonConvert.SerializeObject(new { @event = "progress", percent, text }, JsonSettings);
+            try
+            {
+                if (InvokeRequired)
+                    BeginInvoke((Action)(() => { try { _web.CoreWebView2.PostWebMessageAsJson(json); } catch { } }));
+                else
+                    _web.CoreWebView2.PostWebMessageAsJson(json);
+            }
+            catch { }
         }
     }
 }
