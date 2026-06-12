@@ -1796,7 +1796,12 @@ async function loadFromXml() {
   } catch (e) {
     alert('Errore durante l\'analisi degli XML: ' + e.message);
     ps.style.display = 'none';
-    if (dzWasVisible && SOURCES.length === 0) document.getElementById('dropzone').style.display = '';
+    if (SOURCES.length > 0) {
+      document.getElementById('info-bar').style.display = '';
+      document.getElementById('analysis').style.display = '';
+    } else if (dzWasVisible) {
+      document.getElementById('dropzone').style.display = '';
+    }
     return;
   }
 
