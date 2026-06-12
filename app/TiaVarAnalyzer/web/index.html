@@ -1832,12 +1832,14 @@ function loadBundle(b, sourceType = 'tia') {
   const vsData = (b.vs || []).map(r => ({
     sorgente: srcName, asse: r.asse || '', indice: parseInt(r.indice) || 0,
     blocco: r.blocco || '', segmento: r.segmento || '', operazione: r.operazione || '',
-    commento: r.commento || '', testo: r.testo || '', linea: parseInt(r.linea) || 0, pagina: null
+    commento: r.commento || '', testo: r.testo || '', linea: parseInt(r.linea) || 0, pagina: null,
+    contesto: r.contesto || ''
   }));
   const appData = (b.app || []).map(r => ({
     sorgente: srcName, numero: parseInt(r.numero) || 0,
     blocco: r.blocco || '', segmento: r.segmento || '', operazione: r.operazione || '',
-    commento: r.commento || '', testo: r.testo || '', linea: parseInt(r.linea) || 0, pagina: null
+    commento: r.commento || '', testo: r.testo || '', linea: parseInt(r.linea) || 0, pagina: null,
+    contesto: r.contesto || ''
   }));
 
   VS_DATA  = [...VS_DATA,  ...vsData];
