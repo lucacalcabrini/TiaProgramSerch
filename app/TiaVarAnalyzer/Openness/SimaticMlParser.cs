@@ -78,7 +78,11 @@ namespace TiaVarAnalyzer.Openness
             if (scope.IndexOf("Constant", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 var cv = access.SelectSingleNode(".//*[local-name()='ConstantValue']");
-                return (cv != null ? cv.InnerText : access.InnerText).Trim();
+                if (cv != null) return cv.InnerText.Trim();
+                // GlobalConstant: <Constant Name="SomeName"/> — il valore è nell'attributo Name, non nel testo
+                var cn = access.SelectSingleNode(".//*[local-name()='Constant']") as XmlElement;
+                if (cn != null) { string n = cn.GetAttribute("Name"); if (!string.IsNullOrEmpty(n)) return n; }
+                return access.InnerText.Trim();
             }
 
             var symbol = FirstChild(access, "Symbol");
