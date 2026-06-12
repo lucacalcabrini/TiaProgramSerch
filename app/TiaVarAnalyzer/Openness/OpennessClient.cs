@@ -247,6 +247,64 @@ namespace TiaVarAnalyzer.Openness
                 CollectTypesWithPath(g, Path.Combine(path, SafeName(g.Name)), acc);
         }
 
+        // ---- analisi di XML SimaticML già esportati (NESSUN TIA richiesto) -----
+        // Legge i file .xml prodotti dall'export (o esportati a mano da TIA) e li
+        // analizza con lo stesso parser usato durante l'export headless. Funziona
+        // su qualunque PC: è puro parsing, non avvia TIA Portal.
+        // `paths` può contenere cartelle (esplorate ricorsivamente) e/o singoli .xml.
+
+        public static Bundle ParseXmlPaths(IEnumerable<string> paths, string sourceName = null,
+                                           Action<int, string> progress = null)
+        {
+            void Report(int p, string t) { try { progress?.Invoke(p, t); } catch { } }
+
+            var files = new List<string>();
+            foreach (var p in paths ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(p)) continue;
+                if (Directory.Exists(p))
+                    files.AddRange(Directory.EnumerateFiles(p, "*.xml", SearchOption.AllDirectories));
+                else if (File.Exists(p) && p.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    files.Add(p);
+            }
+            files = files.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (files.Count == 0)
+                throw new Exception("Nessun file .xml trovato nel percorso selezionato.");
+
+            var vs = new List<VsRow>();
+            var app = new List<AppRow>();
+            int parsed = 0, skipped = 0;
+
+            for (int i = 0; i < files.Count; i++)
+            {
+                if (i % 10 == 0 || i == files.Count - 1)
+                    Report(5 + (int)(85.0 * (i + 1) / files.Count), $"Analisi XML: {i + 1}/{files.Count}");
+
+                string blockName = Path.GetFileNameWithoutExtension(files[i]);
+                try
+                {
+                    var doc = new XmlDocument();
+                    doc.Load(files[i]);
+                    // solo i documenti SimaticML con blocchi di codice contengono <Access>;
+                    // tabelle variabili/UDT non producono match e vengono semplicemente ignorate.
+                    SimaticMlParser.Parse(doc, blockName, vs, app);
+                    parsed++;
+                }
+                catch { skipped++; }
+            }
+
+            Report(92, "Completamento analisi...");
+            string name = string.IsNullOrWhiteSpace(sourceName) ? "XML esportato" : sourceName;
+            return new Bundle
+            {
+                ExportedAt = DateTime.Now.ToString("s"),
+                Project = new ProjectMeta { Name = name, Path = null, TiaVersion = null },
+                Stats = new Stats { Blocks = parsed, Skipped = skipped, Vs = vs.Count, App = app.Count },
+                Vs = vs,
+                App = app
+            };
+        }
+
         // ---- XML grezzo di un blocco (debug / calibrazione parser) ------------
 
         public string GetRawXml(string path, string blockName)
