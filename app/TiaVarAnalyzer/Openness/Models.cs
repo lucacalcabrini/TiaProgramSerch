@@ -48,6 +48,7 @@ namespace TiaVarAnalyzer.Openness
         public string Commento { get; set; }
         public string Testo { get; set; }
         public int Linea { get; set; }
+        public string Contesto { get; set; }
     }
 
     public class AppRow
@@ -59,6 +60,7 @@ namespace TiaVarAnalyzer.Openness
         public string Commento { get; set; }
         public string Testo { get; set; }
         public int Linea { get; set; }
+        public string Contesto { get; set; }
     }
 
     // Esito dell'export completo del SW del progetto in XML (SimaticML).

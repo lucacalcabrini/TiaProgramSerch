@@ -22,51 +22,91 @@ namespace TiaVarAnalyzer.Openness
             var accesses = doc.SelectNodes("//*[local-name()='Access']");
             if (accesses == null) return;
 
-            int line = 0;
+            // Raggruppa accessi per CompileUnit (reference equality — XmlNode non sovrascrive Equals)
+            var groups = new Dictionary<XmlNode, List<XmlElement>>();
+            var groupOrder = new List<XmlNode>();
+
             foreach (XmlNode node in accesses)
             {
                 var acc = node as XmlElement;
                 if (acc == null) continue;
-
-                // salta gli Access che sono indici annidati di un Component
                 if (acc.ParentNode is XmlElement pe && pe.LocalName == "Component") continue;
 
-                string text = AccessToText(acc);
-                if (string.IsNullOrEmpty(text)) continue;
-                line++;
+                XmlNode key = (XmlNode)FindCompileUnit(acc) ?? doc;
+                if (!groups.ContainsKey(key)) { groups[key] = new List<XmlElement>(); groupOrder.Add(key); }
+                groups[key].Add(acc);
+            }
 
-                string seg = SegmentTitle(acc);
-                string op = OperationFromContext(acc);
+            int line = 0;
+            foreach (var cuKey in groupOrder)
+            {
+                var accList = groups[cuKey];
+                var cuEl = cuKey as XmlElement;
 
-                foreach (Match m in VsRe.Matches(text))
+                string seg = cuEl != null ? SegmentTitleFromCu(cuEl) : "";
+
+                // Contesto: tutti gli operandi distinti del CompileUnit (pseudo-listato del segmento)
+                var ctxLines = new List<string>();
+                foreach (var a in accList)
                 {
-                    vsOut.Add(new VsRow
-                    {
-                        Asse = m.Groups[1].Value.Trim().Trim('"'),
-                        Indice = int.Parse(m.Groups[2].Value),
-                        Blocco = blockName,
-                        Segmento = seg,
-                        Operazione = op,
-                        Commento = "",
-                        Testo = text,
-                        Linea = line
-                    });
+                    string t = AccessToText(a);
+                    if (!string.IsNullOrEmpty(t) && !ctxLines.Contains(t)) ctxLines.Add(t);
                 }
+                string contesto = string.Join("\n", ctxLines);
 
-                foreach (Match m in AppRe.Matches(text))
+                foreach (var acc in accList)
                 {
-                    appOut.Add(new AppRow
+                    string text = AccessToText(acc);
+                    if (string.IsNullOrEmpty(text)) continue;
+                    line++;
+
+                    string op = OperationFromContext(acc);
+
+                    foreach (Match m in VsRe.Matches(text))
                     {
-                        Numero = int.Parse(m.Groups[1].Value),
-                        Blocco = blockName,
-                        Segmento = seg,
-                        Operazione = op,
-                        Commento = "",
-                        Testo = text,
-                        Linea = line
-                    });
+                        vsOut.Add(new VsRow
+                        {
+                            Asse = m.Groups[1].Value.Trim().Trim('"'),
+                            Indice = int.Parse(m.Groups[2].Value),
+                            Blocco = blockName,
+                            Segmento = seg,
+                            Operazione = op,
+                            Commento = "",
+                            Testo = text,
+                            Linea = line,
+                            Contesto = contesto
+                        });
+                    }
+
+                    foreach (Match m in AppRe.Matches(text))
+                    {
+                        appOut.Add(new AppRow
+                        {
+                            Numero = int.Parse(m.Groups[1].Value),
+                            Blocco = blockName,
+                            Segmento = seg,
+                            Operazione = op,
+                            Commento = "",
+                            Testo = text,
+                            Linea = line,
+                            Contesto = contesto
+                        });
+                    }
                 }
             }
+        }
+
+        static XmlElement FindCompileUnit(XmlElement acc)
+        {
+            XmlNode n = acc.ParentNode;
+            int d = 0;
+            while (n != null && d < 30)
+            {
+                if (n.LocalName.IndexOf("CompileUnit", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return n as XmlElement;
+                n = n.ParentNode; d++;
+            }
+            return null;
         }
 
         // Ricostruisce il testo TIA di un nodo <Access>.
@@ -128,26 +168,23 @@ namespace TiaVarAnalyzer.Openness
             return "";
         }
 
-        static string SegmentTitle(XmlElement access)
+        static string SegmentTitleFromCu(XmlElement cu)
         {
-            XmlNode n = access.ParentNode;
-            int d = 0;
-            while (n != null && d < 30)
+            if (cu == null) return "";
+            var title = cu.SelectSingleNode(
+                ".//*[local-name()='MultilingualText'][@CompositionName='Title']") as XmlElement;
+            if (title != null)
             {
-                if (n.LocalName.IndexOf("CompileUnit", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    var title = (n as XmlElement)?.SelectSingleNode(
-                        ".//*[local-name()='MultilingualText'][@CompositionName='Title']") as XmlElement;
-                    if (title != null)
-                    {
-                        string t = MultilingualText(title);
-                        if (!string.IsNullOrEmpty(t)) return t;
-                    }
-                    return "";
-                }
-                n = n.ParentNode; d++;
+                string t = MultilingualText(title);
+                if (!string.IsNullOrEmpty(t)) return t;
             }
             return "";
+        }
+
+        static string SegmentTitle(XmlElement access)
+        {
+            var cu = FindCompileUnit(access);
+            return SegmentTitleFromCu(cu);
         }
 
         static string MultilingualText(XmlElement node)
